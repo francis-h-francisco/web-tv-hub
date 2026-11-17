@@ -152,6 +152,8 @@ body.kids .topnav, body.kids .tab.lang, body.kids [data-action="sharech"], body.
 .chip .x { margin-left: .4rem; opacity: .7; }
 .more-prefs { margin-top: 1.2rem; }
 .more-prefs summary { cursor: pointer; color: var(--dim); padding: .5rem 0; border-radius: .4rem; }
+.consent { display: flex; gap: .7rem; align-items: flex-start; margin: 1rem 0 .4rem; font-size: .9rem; line-height: 1.45; color: var(--dim); cursor: pointer; }
+.consent input { width: 1.3rem; height: 1.3rem; flex: 0 0 auto; margin-top: .1rem; accent-color: var(--accent); }
 .panel-actions { display: flex; gap: .7rem; justify-content: flex-end; margin-top: 1.6rem; flex-wrap: wrap; }
 .btn { background: var(--bg3); border: 1px solid var(--line); border-radius: .6rem; padding: .7rem 1.25rem; text-decoration: none; color: var(--text); display: inline-block; }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }

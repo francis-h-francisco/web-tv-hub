@@ -817,12 +817,14 @@
   function hasReminder(chId, s) { return S.reminders.some((r) => r.ch === chId && r.s === s); }
   function toggleReminder(ch, s) {
     const p = progs(ch).find((x) => x.s === s); if (!p) return;
-    if (hasReminder(ch.id, s)) { S.reminders.filter((r) => r.ch === ch.id && r.s === s).forEach((r) => scheduleNative(r, true)); S.reminders = S.reminders.filter((r) => !(r.ch === ch.id && r.s === s)); toast('Reminder removed.', null, 2500); }
+    if (hasReminder(ch.id, s)) { S.reminders.filter((r) => r.ch === ch.id && r.s === s).forEach((r) => { scheduleNative(r, true); emailReminder(r, true); }); S.reminders = S.reminders.filter((r) => !(r.ch === ch.id && r.s === s)); toast('Reminder removed.', null, 2500); }
     else {
       S.reminders = S.reminders.filter((r) => r.s > Date.now() - 3600e3);
       if (S.reminders.length >= FREE_REMINDERS) { toast('You can keep up to ' + FREE_REMINDERS + ' reminders. Remove one in My TV to add another.'); return; }
       const rem = { ch: ch.id, name: ch.name, s: p.s, t: p.t, fired: OFFSETS.filter((o) => Date.now() >= p.s - o).map(String) };
       S.reminders.push(rem); scheduleNative(rem);
+      if (emailToken()) emailReminder(rem);
+      else if (!nativeNotes() && !kids() && !S.emailOffered && (S.emailOffered = true)) setTimeout(() => toast('Want this reminder by email too?', { label: '📧 Email me', fn: () => openEmail(rem) }, 9000, 'emailoffer'), 1200);
       toast("We'll remind you about <b>" + esc(p.t) + '</b> at ' + fmtTime(p.s) + ' (also 1 hour and 15 minutes before)' + (nativeNotes() ? ', even when the app is closed.' : ' while this site is open. Get the Android app for notifications when it\'s closed.'));
       if (window.Notification && Notification.permission === 'default') { try { Notification.requestPermission(); } catch (e) { /* unsupported */ } }
     }
@@ -844,6 +846,64 @@
     const before = S.reminders.length;
     S.reminders = S.reminders.filter((r) => r.s > t - 30 * 60e3);
     if (changed || before !== S.reminders.length) { store.set('reminders', S.reminders); renderTimeline(); }
+  }
+
+  // ---------------------------------------------------------------- email reminders
+  // Reminder emails never require marketing consent. Offers from our sister brands are a separate,
+  // unticked choice (wording kept identical to cloudflare/functions/api/email/_email.js).
+  const MARKETING_TEXT_HTML = 'Also send me occasional updates and offers from Web TV Hub and its sister brands: <a href="https://norvicka.pages.dev" target="_blank" rel="noopener">Norvicka Studio</a> (practical systems and automations for small businesses) and <a href="https://preview.pivory.pages.dev" target="_blank" rel="noopener">Pivory Systems</a> (ready-made, automated business systems). I can unsubscribe anytime.';
+  const tzName = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) { return ''; } };
+  function emailToken() { return store.get('emailToken', null); }
+  function reminderPayload(r) {
+    const ch = S.byId.get(r.ch); const p = ch && progs(ch).find((x) => x.s === r.s);
+    return { ch: r.ch, chName: r.name, title: r.t, start: r.s, url: ch ? shareUrl(ch, p) : undefined };
+  }
+  async function emailApi(path, method, body) {
+    const r = await fetch(API + '/email/' + path, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    return r.json();
+  }
+  function emailReminder(r, remove) {
+    const t = emailToken(); if (!t) return;
+    const body = remove ? { token: t, ch: r.ch, start: r.s } : { token: t, reminder: reminderPayload(r) };
+    emailApi('reminder', remove ? 'DELETE' : 'POST', body).then((j) => { if (j && j.resubscribe) store.set('emailToken', null); }).catch(() => {});
+  }
+  function openEmail(rem) {
+    openOverlay('<h2>Email reminders</h2><p>We\'ll email you about an hour before the shows you set reminders for. Your address is used only for that, unless you choose otherwise below.</p>' +
+      '<input class="field" id="em" data-focus type="email" inputmode="email" autocomplete="email" placeholder="you@example.com">' +
+      '<label class="consent"><input type="checkbox" id="mk" data-focus> <span>' + MARKETING_TEXT_HTML + '</span></label>' +
+      '<p class="small">Tapping the button means you agree to get reminder emails. We\'ll send a confirmation email first. <a href="privacy.html" target="_blank" rel="noopener">Privacy</a></p><p class="small" id="emMsg"></p>' +
+      '<div class="panel-actions"><button class="btn" data-focus data-close>Not now</button><button class="btn primary" data-focus id="emGo">Email me reminders</button></div>');
+    $('#emGo').onclick = async () => {
+      const email = $('#em').value.trim(), msg = $('#emMsg');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { msg.textContent = 'Please check the email address.'; return; }
+      $('#emGo').disabled = true; msg.textContent = 'Sending…';
+      try {
+        const j = await emailApi('subscribe', 'POST', { email, marketing: $('#mk').checked, tz: tzName(), token: emailToken(), reminder: rem ? reminderPayload(rem) : undefined });
+        if (j.error) { msg.textContent = j.error; $('#emGo').disabled = false; return; }
+        if (j.token) {
+          store.set('emailToken', j.token);
+          S.reminders.filter((r) => r !== rem && r.s > Date.now()).forEach((r) => emailReminder(r)); // reminders set earlier
+        }
+        closeOverlay();
+        toast(j.confirmed ? '📧 Done. We\'ll email you about an hour before.' : '📧 Almost done: check your inbox and tap <b>Confirm my email</b> (from Web TV Hub). Reminders start after that.', null, 9000, 'email');
+      } catch (e) { msg.textContent = "Couldn't reach Web TV Hub. Please try again in a moment."; $('#emGo').disabled = false; }
+    };
+  }
+
+  async function renderEmailBox() {
+    const box = $('#emailBox'); if (!box) return;
+    const t = emailToken();
+    const offer = () => { box.innerHTML = '<p>Get an email about an hour before the shows you set reminders for.</p><button class="btn small" data-focus id="emOpen">📧 Get reminders by email</button>'; $('#emOpen').onclick = () => openEmail(null); };
+    if (!t) return offer();
+    try {
+      const j = await fetch(API + '/email/status?t=' + encodeURIComponent(t)).then((r) => r.json());
+      if (!j.ok) { store.set('emailToken', null); return offer(); }
+      const base = API + '/email/unsubscribe?t=' + encodeURIComponent(t);
+      box.innerHTML = '<p>Sending to <b>' + esc(j.email) + '</b> · ' + (j.confirmed ? '✓ confirmed' : 'waiting for you to confirm (check your inbox)') + (j.marketing ? ' · offers on' : '') + '</p>' +
+        '<div class="chips">' + (j.marketing ? '<a class="btn small" data-focus target="_blank" rel="noopener" href="' + esc(base + '&what=marketing') + '">Stop offers</a>' : '') +
+        '<a class="btn small" data-focus target="_blank" rel="noopener" id="emStop" href="' + esc(base) + '">Stop all emails</a></div>';
+      $('#emStop').addEventListener('click', () => store.set('emailToken', null));
+    } catch (e) { box.innerHTML = '<p class="small">Email settings are unavailable right now.</p>'; }
   }
 
   // ---------------------------------------------------------------- toasts
@@ -1045,6 +1105,7 @@
         missing.slice(0, 3).map((p) => '<a class="btn small" data-focus target="_blank" rel="noopener" href="https://www.justwatch.com/ph/search?q=' + encodeURIComponent(p.label) + '">Where to watch “' + esc(p.label) + '” ↗</a>').join('') + '</div>' : '') +
       '<h3>Reminders (' + rem.length + '/' + FREE_REMINDERS + ')</h3>' +
       (rem.length ? '<div class="list">' + rem.map((r) => '<button class="li" data-focus data-unrem="' + esc(r.ch) + '|' + r.s + '"><span class="when">' + fmtTime(r.s) + '</span><span class="what"><b>' + esc(r.t) + '</b><small>' + esc(r.name) + '</small></span><span class="small">Remove ✕</span></button>').join('') + '</div>' : '<p>No reminders yet. Use 🔔 Remind me on any upcoming show.</p>') +
+      '<h3>Email reminders</h3><div id="emailBox"><p class="small">Checking…</p></div>' +
       '<h3>Favorite channels</h3>' +
       (favs.length ? '<div class="list">' + favs.map((c) => { const np = nowProg(c); return '<button class="li" data-focus data-play="' + esc(c.id) + '"><span class="when">' + (np ? '● NOW' : 'LIVE') + '</span><span class="what"><b>' + esc(c.name) + '</b><small>' + esc(np ? np.t : c.desc || '') + '</small></span><span class="small">Watch ▸</span></button>'; }).join('') + '</div>' : '<p>Tap ☆ next to a channel\'s name to add it here.</p>') +
       '<div class="panel-actions"><button class="btn" data-focus data-close data-autofocus>Close</button></div>');
@@ -1054,8 +1115,9 @@
       if (s && s > Date.now()) { toggleReminder(c, s); openMyTv(); return; }
       closeOverlay(); play(c, { list: tabList(), user: true });
     }));
-    $$('#panel [data-unrem]').forEach((b) => b.addEventListener('click', () => { const [ch, s] = b.dataset.unrem.split('|'); S.reminders.filter((r) => r.ch === ch && r.s === +s).forEach((r) => scheduleNative(r, true)); S.reminders = S.reminders.filter((r) => !(r.ch === ch && r.s === +s)); store.set('reminders', S.reminders); renderTimeline(); openMyTv(); }));
+    $$('#panel [data-unrem]').forEach((b) => b.addEventListener('click', () => { const [ch, s] = b.dataset.unrem.split('|'); S.reminders.filter((r) => r.ch === ch && r.s === +s).forEach((r) => { scheduleNative(r, true); emailReminder(r, true); }); S.reminders = S.reminders.filter((r) => !(r.ch === ch && r.s === +s)); store.set('reminders', S.reminders); renderTimeline(); openMyTv(); }));
     const gp = $('#panel [data-goprofile]'); if (gp) gp.addEventListener('click', () => openProfile());
+    renderEmailBox();
   }
 
   // Search with typo tolerance + "where to watch" for things that aren't on free TV
@@ -1118,6 +1180,7 @@
       '<h3>About</h3><p>A free guide to live channels that broadcasters already stream for free. We check every channel every 6 hours, and your device double-checks the ones you can see, so channels that don\'t work for you are removed automatically.</p>' +
       '<p>We don\'t host or re-stream any video. Channel data comes from the open <a href="https://github.com/iptv-org/iptv" target="_blank" rel="noopener">iptv-org</a> project; schedules and channel descriptions from public listings of free ad-supported services; cast information from <a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>.</p>' +
       '<p>To keep the guide honest, your device anonymously reports whether channels play (just the channel and works / doesn\'t work; your country comes from your network). Channels several viewers in a country can\'t play are hidden for everyone there. Nothing else is collected.</p>' +
+      '<p><a href="privacy.html" target="_blank" rel="noopener">Privacy</a>: what we collect (very little) and your choices.</p>' +
       '<p>Rights-holder and want a channel removed? <a href="https://github.com/francis-h-francisco/web-tv-hub/issues/new?title=Removal%20request" target="_blank" rel="noopener">Open a removal request</a>.</p>' +
       '<p class="small">Channel list checked ' + esc(relTime(S.generated)) + '.' + (S.hiddenForBrowser ? ' ' + S.hiddenForBrowser + ' more free channels play on Android TV sticks, phones and Safari but not in this browser.' : '') + '</p>' +
       '<div class="panel-actions"><button class="btn" data-focus data-close data-autofocus>Close</button></div>');
