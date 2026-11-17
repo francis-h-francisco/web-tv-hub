@@ -539,7 +539,7 @@
     const fy = forYou(); if (fy.length) t.push({ id: 'foryou', name: 'For you', list: fy });
     const rc = recent(); if (rc.length) t.push({ id: 'recent', name: '⟲ Continue watching', list: rc });
     const favs = v.filter((c) => S.favs.has(c.id)); if (favs.length) t.push({ id: 'favs', name: '★ Favorites', list: favs });
-    const order = ['series', 'movies', 'sitcoms', 'animations', 'sports', 'news'];
+    const order = ['series', 'movies', 'sitcoms', 'animations', 'sports', 'news', 'music', 'documentaries', 'cooking', 'lifestyle'];
     const cats = S.categories.slice().sort((a, b) => (order.indexOf(a.id) + 99) % 99 - (order.indexOf(b.id) + 99) % 99);
     for (const cat of cats) {
       // channels with a schedule first, so the guide reads like a TV guide
