@@ -74,6 +74,34 @@
         "classic",
         "entertainment"
       ]
+    },
+    {
+      "id": "music",
+      "name": "Music",
+      "from": [
+        "music"
+      ]
+    },
+    {
+      "id": "documentaries",
+      "name": "Documentaries",
+      "from": [
+        "documentary"
+      ]
+    },
+    {
+      "id": "cooking",
+      "name": "Cooking & Food",
+      "from": [
+        "cooking"
+      ]
+    },
+    {
+      "id": "lifestyle",
+      "name": "Lifestyle",
+      "from": [
+        "lifestyle"
+      ]
     }
   ],
   "maxPerCategory": 60,
