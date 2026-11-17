@@ -1,6 +1,6 @@
 {
   "_doc": "Curation rules for the 6-hourly refresh. See docs/PLAYBOOK.md section 5A. Edit and push; the next run applies them.",
-  "siteOrigin": "https://francis-h-francisco.github.io",
+  "siteOrigin": "https://webtv-hub.pages.dev",
   "languages": [
     "eng",
     "fil",
@@ -263,5 +263,5 @@
     "budgetSeconds": 300
   },
   "maxPerCategoryOtherLanguage": 15,
-  "siteUrl": "https://francis-h-francisco.github.io/web-tv-hub/"
+  "siteUrl": "https://webtv-hub.pages.dev/"
 }

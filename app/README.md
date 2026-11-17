@@ -1,6 +1,6 @@
 # Web TV Hub — Android app
 
-A light native shell around the web app (https://francis-h-francisco.github.io/web-tv-hub/), built with
+A light native shell around the web app (https://webtv-hub.pages.dev/), built with
 [Capacitor](https://capacitorjs.com) (MIT). It adds:
 
 - **Reminders as real phone notifications**, which fire even when the app is closed (`@capacitor/local-notifications`).

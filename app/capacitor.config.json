@@ -3,9 +3,12 @@
   "appName": "Web TV Hub",
   "webDir": "www",
   "server": {
-    "url": "https://francis-h-francisco.github.io/web-tv-hub/",
+    "url": "https://webtv-hub.pages.dev/",
     "androidScheme": "https",
-    "allowNavigation": ["francis-h-francisco.github.io"]
+    "allowNavigation": [
+      "webtv-hub.pages.dev",
+      "francis-h-francisco.github.io"
+    ]
   },
   "android": {
     "backgroundColor": "#0b0d12",

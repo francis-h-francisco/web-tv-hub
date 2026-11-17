@@ -69,6 +69,7 @@
   <p class="muted">Prefer not to install anything? Open <a href="./">Web TV Hub</a> in your browser and use your browser's menu → “Add to Home screen”.</p>
 </div>
 <script>
+if (location.hostname === 'francis-h-francisco.github.io') location.replace('https://webtv-hub.pages.dev/download.html');
 (function () {
   'use strict';
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

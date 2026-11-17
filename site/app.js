@@ -2,6 +2,27 @@
 (function () {
   'use strict';
 
+  // ---------------------------------------------------------------- moved to webtv-hub.pages.dev
+  // The old GitHub Pages address forwards to the new one and carries this browser's settings along
+  // (each web address has its own storage), so nobody loses their profile, favorites or reminders.
+  const NEW_HOME = 'https://webtv-hub.pages.dev/';
+  if (location.hostname === 'francis-h-francisco.github.io' && !window.Capacitor) {
+    const keep = ['profile', 'favs', 'reminders', 'history', 'byo', 'tab', 'kids', 'cc', 'remotePaired', 'remoteCode', 'last'];
+    const carry = {};
+    try { keep.forEach((k) => { const v = localStorage.getItem('wth.' + k); if (v != null) carry[k] = v; }); } catch (e) { /* storage blocked */ }
+    const rest = location.pathname.replace(/^\/web-tv-hub\/?/, '');
+    const hash = Object.keys(carry).length ? '#migrate=' + encodeURIComponent(JSON.stringify(carry)) : '';
+    location.replace(NEW_HOME + rest + location.search + hash);
+    return;
+  }
+  if (location.hash.indexOf('#migrate=') === 0) {
+    try {
+      const carry = JSON.parse(decodeURIComponent(location.hash.slice(9)));
+      Object.keys(carry).forEach((k) => { if (localStorage.getItem('wth.' + k) == null) localStorage.setItem('wth.' + k, carry[k]); });
+    } catch (e) { /* ignore a malformed hand-over */ }
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+
   // ---------------------------------------------------------------- storage
   // Everything personal stays in this browser.
   const LS = 'wth.';
