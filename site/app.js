@@ -110,6 +110,8 @@
   const ICONS = {"globe": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z\"/>", "pin": "<path d=\"M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z\"/><circle cx=\"12\" cy=\"10\" r=\"2.3\"/>", "play": "<path d=\"M7 4.5v15l12-7.5z\" fill=\"currentColor\" stroke=\"none\"/>", "pause": "<rect x=\"6\" y=\"4.5\" width=\"4\" height=\"15\" rx=\"1\" fill=\"currentColor\" stroke=\"none\"/><rect x=\"14\" y=\"4.5\" width=\"4\" height=\"15\" rx=\"1\" fill=\"currentColor\" stroke=\"none\"/>", "vol": "<path d=\"M3.5 9.5v5h3.8l4.7 4V5.5l-4.7 4z\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.3a8 8 0 0 1 0 11.4\"/>", "mute": "<path d=\"M3.5 9.5v5h3.8l4.7 4V5.5l-4.7 4z\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M16 9.5l5 5M21 9.5l-5 5\"/>", "voldown": "<path d=\"M3.5 9.5v5h3.8l4.7 4V5.5l-4.7 4z\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M15.5 12h5.5\"/>", "volup": "<path d=\"M3.5 9.5v5h3.8l4.7 4V5.5l-4.7 4z\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M15.5 12h5.5M18.25 9.25v5.5\"/>", "cast": "<path d=\"M2.5 17.5a4 4 0 0 1 4 4M2.5 13.5a8 8 0 0 1 8 8M2.5 9.5a12 12 0 0 1 12 12\"/><path d=\"M2.5 6.5v-1a2 2 0 0 1 2-2h15a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-2.5\"/>", "pip": "<rect x=\"2.5\" y=\"4.5\" width=\"19\" height=\"15\" rx=\"2\"/><rect x=\"12\" y=\"11\" width=\"7\" height=\"6\" rx=\"1\" fill=\"currentColor\" stroke=\"none\"/>", "moon": "<path d=\"M20 14.6A8.2 8.2 0 0 1 9.4 4a8.2 8.2 0 1 0 10.6 10.6z\"/>", "star": "<path d=\"M12 3.2l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z\"/>", "starOn": "<path d=\"M12 3.2l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z\" fill=\"currentColor\"/>", "share": "<path d=\"M12 3.5v11M7.5 8l4.5-4.5L16.5 8\"/><path d=\"M5 12.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-6.5\"/>", "fs": "<path d=\"M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5\"/>", "prev": "<path d=\"M6 5v14\"/><path d=\"M19 5L9 12l10 7z\" fill=\"currentColor\" stroke=\"none\"/>", "next": "<path d=\"M18 5v14\"/><path d=\"M5 5l10 7-10 7z\" fill=\"currentColor\" stroke=\"none\"/>", "remote": "<rect x=\"7\" y=\"2.5\" width=\"10\" height=\"19\" rx=\"2.5\"/><circle cx=\"12\" cy=\"8\" r=\"1.6\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M10.5 17.5h3\"/>", "tv": "<rect x=\"2.5\" y=\"6\" width=\"19\" height=\"13\" rx=\"2\"/><path d=\"M8 3l4 3 4-3\"/>", "search": "<circle cx=\"11\" cy=\"11\" r=\"6.5\"/><path d=\"M20.5 20.5l-4.8-4.8\"/>", "user": "<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21a8 8 0 0 1 16 0\"/>", "menu": "<path d=\"M4 6.5h16M4 12h16M4 17.5h16\"/>"};
   const ic = (n) => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + ICONS[n] + '</svg>';
 
+  // running inside the Android app (Capacitor shell): no 'get the app' / 'install' prompts
+  const IN_APP = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   function fold(s) {
     return String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
   }
@@ -216,7 +218,7 @@
     const raw = (S.raw || []).find((x) => x.id === id);
     if (!raw) { setTimeout(() => toast("That channel isn't available any more. Here's what's on now."), 1500); return; }
     let why = null;
-    if (!S.byId.has(id)) why = "can't play in this browser. Try the Android app or Safari.";
+    if (!S.byId.has(id)) why = IN_APP ? "can't play on this device." : "can't play in this browser. Try the Android app or Safari.";
     else if (!regionOk(raw)) why = "isn't offered in " + countryName(S.country) + '.';
     else if (!langOk(raw)) why = 'is in ' + langName(raw.lang) + '. Add it with 🌐 to watch.';
     else if (isUnavailable(raw)) why = "isn't working where you are right now.";
@@ -1147,7 +1149,7 @@
       (EMAIL_ON ? '<h3>Email reminders</h3><div id="emailBox"><p class="small">Checking…</p></div>' : '') +
       '<h3>Favorite channels</h3>' +
       (favs.length ? '<div class="list">' + favs.map((c) => { const np = nowProg(c); return '<button class="li" data-focus data-play="' + esc(c.id) + '"><span class="when">' + (np ? '● NOW' : 'LIVE') + '</span><span class="what"><b>' + esc(c.name) + '</b><small>' + esc(np ? np.t : c.desc || '') + '</small></span><span class="small">Watch ▸</span></button>'; }).join('') + '</div>' : '<p>Tap ☆ next to a channel\'s name to add it here.</p>') +
-      '<div class="panel-actions"><button class="btn" data-focus data-close data-autofocus>Close</button></div>');
+      '<div class="panel-actions"><button class="btn" data-focus data-close>Close</button></div>');
     $$('#panel [data-play]').forEach((b) => b.addEventListener('click', () => {
       const c = S.byId.get(b.dataset.play); const s = +b.dataset.s;
       if (!c) return;
@@ -1239,18 +1241,18 @@
     const url = location.origin + location.pathname;
     openOverlay('<h2>More</h2>' +
       '<h3>Open on another screen</h3><div style="display:flex;gap:1.4rem;align-items:center;flex-wrap:wrap"><div class="qr" id="qr"></div><div style="flex:1;min-width:14rem"><p>Scan with your phone camera, or type this address into your TV\'s browser (TV Bro, BrowseHere, Silk):</p><div class="bigurl">' + esc(url.replace(/^https:\/\//, '')) + '</div><p class="small">On a TV stick, bookmark it so it\'s one click next time.</p></div></div>' +
-      '<h3>Android app</h3><p>Same TV, plus reminders that pop up even when the app is closed, and works as a remote for your TV.</p><a class="btn primary" data-focus href="download.html">Get the Android app</a>' +
-      '<h3>Install as an app</h3><p>' + (installPrompt ? 'Add Web TV Hub to your home screen. It opens full screen like a regular app.' : 'On a phone, open your browser\'s menu and choose “Add to Home screen”. It opens full screen like a regular app.') + '</p>' + (installPrompt ? '<button class="btn primary" data-focus data-install>Install app</button>' : '') +
+      (IN_APP ? '' : '<h3>Android app</h3><p>Same TV, plus reminders that pop up even when the app is closed, and works as a remote for your TV.</p><a class="btn primary" data-focus href="download.html">Get the Android app</a>') +
+      (IN_APP ? '' : '<h3>Install as an app</h3><p>' + (installPrompt ? 'Add Web TV Hub to your home screen. It opens full screen like a regular app.' : 'On a phone, open your browser\'s menu and choose “Add to Home screen”. It opens full screen like a regular app.') + '</p>' + (installPrompt ? '<button class="btn primary" data-focus data-install>Install app</button>' : '')) +
       '<h3>My playlist</h3><p>Add one .m3u playlist link of your own. It\'s saved only in this browser and never sent to us. Links must start with https:// and the server must allow web players.</p>' +
       '<input class="field" id="m3u" data-focus placeholder="https://example.com/my-playlist.m3u" value="' + esc(S.byo ? S.byo.url : '') + '"><p class="small" id="m3uMsg">' + (S.byo ? S.byo.channels.length + ' channels loaded.' : '') + '</p>' +
       '<div class="chips">' + (S.byo ? '<button class="btn small" data-focus data-m3u="remove">Remove playlist</button>' : '') + '<button class="btn small" data-focus data-m3u="save">Load playlist</button></div>' +
       '<h3>About</h3><p>A free guide to live channels that broadcasters already stream for free. We check every channel every 6 hours, and your device double-checks the ones you can see, so channels that don\'t work for you are removed automatically.</p>' +
       '<p>We don\'t host or re-stream any video. Channel data comes from the open <a href="https://github.com/iptv-org/iptv" target="_blank" rel="noopener">iptv-org</a> project; schedules and channel descriptions from public listings of free ad-supported services; cast information from <a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>.</p>' +
       '<p>To keep the guide honest, your device anonymously reports whether channels play (just the channel and works / doesn\'t work; your country comes from your network). Channels several viewers in a country can\'t play are hidden for everyone there. Nothing else is collected.</p>' +
-      '<p class="links"><a href="download.html">Android app</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms &amp; disclaimer</a></p>' +
+      '<p class="links">' + (IN_APP ? '' : '<a href="download.html">Android app</a> · ') + '<a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms &amp; disclaimer</a></p>' +
       '<p>Rights-holder and want a channel removed? <a href="https://github.com/francis-h-francisco/web-tv-hub/issues/new?title=Removal%20request" target="_blank" rel="noopener">Open a removal request</a>.</p>' +
       '<p class="small">Channel list checked ' + esc(relTime(S.generated)) + '.' + (S.hiddenCount ? ' ' + S.hiddenCount + ' channel' + (S.hiddenCount > 1 ? 's were' : ' was') + " hidden this visit because " + (S.hiddenCount > 1 ? "they don't" : "it doesn't") + ' play where you are.' : '') + (S.hiddenForBrowser ? ' ' + S.hiddenForBrowser + ' more free channels play on Android TV sticks, phones and Safari but not in this browser.' : '') + '</p>' +
-      '<div class="panel-actions"><button class="btn" data-focus data-close data-autofocus>Close</button></div>');
+      '<div class="panel-actions"><button class="btn" data-focus data-close>Close</button></div>');
     drawQr(url);
     const ib = $('[data-install]'); if (ib) ib.onclick = async () => { installPrompt.prompt(); await installPrompt.userChoice.catch(() => {}); installPrompt = null; closeOverlay(); };
     const rm = $('[data-m3u="remove"]'); if (rm) rm.onclick = () => { S.byo = null; store.set('byo', null); renderTabs(); renderGuide(); closeOverlay(); toast('Playlist removed.'); };

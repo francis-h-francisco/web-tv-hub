@@ -39,7 +39,7 @@
   h2 .ic { color: #3ddc84; }
   .feat b { display: block; margin-bottom: .2rem; }
   .feat p { margin: 0; color: var(--dim); font-size: .92rem; line-height: 1.45; }
-  @media (min-width: 700px) { .why { grid-template-columns: 1fr 1fr 1fr; } }
+  @media (min-width: 600px) { .why { grid-template-columns: 1fr 1fr; } }
 </style>
 </head>
 <body>
@@ -108,7 +108,7 @@ if (location.hostname === 'francis-h-francisco.github.io') location.replace('htt
         scan = { sha256: m && m[1], signing: sg && sg[1] };
       }
       rel.innerHTML = '<h2>Version ' + esc(r.tag_name.replace('app-v', '')) + '</h2><p class="muted">Released ' + when(r.published_at) + (apk ? ' · ' + mb(apk.size) : '') + '</p>' +
-        (apk ? '<a class="btn primary big" href="' + esc(apk.browser_download_url) + '">⬇ Download for Android</a>' : '<p>File not available.</p>');
+        (apk ? '<a class="btn primary big" href="' + esc(apk.browser_download_url) + '"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg> Download for Android</a>' : '<p>File not available.</p>');
       const sha = scan && scan.sha256;
       checks.innerHTML =
         '<div class="check"><span class="ic">✓</span><div><b>Malware scan: clean.</b> Scanned with ClamAV (open-source antivirus) right after it was built. If anything had been found, it would not have been published.</div></div>' +
