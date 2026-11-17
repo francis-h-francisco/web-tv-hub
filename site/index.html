@@ -2,64 +2,68 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12">
-<meta name="description" content="Free, curated live TV from channels that broadcasters stream for free. Built for TVs and remotes.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Free, curated live TV from channels that broadcasters stream for free. Built for TVs, remotes and phones.">
 <title>Web TV Hub — Free curated live TV</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <header class="topbar">
-  <div class="brand"><span class="brand-dot"></span>Web TV Hub</div>
-  <nav class="topnav">
+  <div class="brand"><span class="brand-dot"></span><span>Web TV Hub</span></div>
+  <nav class="topnav" aria-label="Main">
     <button class="navbtn" data-focus data-action="search">Search</button>
-    <button class="navbtn" data-focus data-action="profile">My profile</button>
-    <button class="navbtn" data-focus data-action="settings">My playlist</button>
-    <button class="navbtn" data-focus data-action="about">About</button>
+    <button class="navbtn" data-focus data-action="mytv">My TV</button>
+    <button class="navbtn" data-focus data-action="profile">Profile</button>
+    <button class="navbtn" data-focus data-action="more">More</button>
   </nav>
   <div class="clock" id="clock"></div>
 </header>
 
-<main>
-  <section class="stage">
-    <div class="player" id="player">
+<div class="layout">
+  <section class="watch" aria-label="Now watching">
+    <div class="player" id="player" data-focus tabindex="0" aria-label="Video player. Press OK for full screen">
       <video id="video" playsinline muted autoplay></video>
       <div class="player-msg" id="playerMsg"></div>
-      <div class="unmute" id="unmute" hidden>Sound is off — press OK or tap to turn it on</div>
+      <button class="unmute" id="unmute" hidden>🔇 Tap or press OK for sound</button>
     </div>
-    <aside class="nowinfo">
-      <div class="now-ch">
-        <img id="nowLogo" alt="" hidden>
-        <div>
-          <div class="now-chname" id="nowName">Loading channels…</div>
-          <div class="now-meta" id="nowMeta"></div>
+    <div class="nowcard">
+      <div class="ch-line">
+        <img id="nowLogo" class="ch-logo" alt="" hidden>
+        <div class="ch-text">
+          <div class="ch-name" id="nowName">Loading channels…</div>
+          <div class="ch-meta" id="nowMeta"></div>
+        </div>
+        <div class="ch-actions">
+          <button class="iconbtn" data-focus data-action="fav" id="favBtn" aria-label="Favorite">☆</button>
+          <button class="iconbtn" data-focus data-action="fullscreen" aria-label="Full screen">⛶</button>
         </div>
       </div>
-      <div class="now-actions">
-        <button class="act" data-focus data-action="fav" id="favBtn">☆ Favorite</button>
-        <button class="act" data-focus data-action="fullscreen">⛶ Full screen</button>
-        <button class="act" data-focus data-action="next">Next ▸</button>
-        <button class="act" data-focus data-action="cc" id="ccBtn" hidden>CC</button>
-      </div>
-      <div class="nowprog" id="nowProg"></div>
-      <p class="hint">Arrows to move · OK to watch · in full screen, ▲▼ change channel · Back to return</p>
-    </aside>
+      <div class="timeline" id="timeline" aria-label="Schedule"></div>
+    </div>
   </section>
 
-  <section class="epg" id="epg" aria-label="Schedule"></section>
+  <section class="browse" aria-label="Channel guide">
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="guide" id="guide"></div>
+    <div class="peek" id="peek"></div>
+  </section>
+</div>
 
-  <section id="rows"></section>
+<nav class="bottombar" aria-label="App">
+  <button data-action="home" class="on"><span>📺</span>Watch</button>
+  <button data-action="search"><span>🔍</span>Search</button>
+  <button data-action="mytv"><span>⭐</span>My TV</button>
+  <button data-action="profile"><span>👤</span>Profile</button>
+</nav>
 
-  <footer class="foot">
-    <p>We don't host any video. Every channel is streamed by its broadcaster or an official free (FAST) service and opened directly in your browser. Channel data: <a href="https://github.com/iptv-org/iptv" target="_blank" rel="noopener">iptv-org</a>. Some channels may not play in your country.</p>
-    <p id="updated"></p>
-  </footer>
-</main>
-
-<div class="overlay" id="overlay" hidden><div class="panel" id="panel"></div></div>
-<div class="toasts" id="toasts"></div>
+<div class="overlay" id="overlay" hidden><div class="panel" id="panel" role="dialog" aria-modal="true"></div></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script src="vendor/hls.min.js"></script>
 <script src="app.js"></script>

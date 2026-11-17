@@ -82,7 +82,14 @@ Large, high-contrast cards; arrow keys, OK/Enter and Back; also mouse and touch.
 | Free FAST streams geo-blocked in PH | Local skip-and-remember; label "may not play in your region". |
 | GitHub schedule paused after 60 days idle | The workflow commits nothing, so keep the repo active or re-enable it from the Actions tab; moving the job to Cloudflare later doesn't fix this, because of the Worker limits above. |
 
+## 8b. v1.1 additions (2026-11-17)
+- **No fake listings.** Streams must deliver a real video segment in the 6-hourly check. Each viewer's device also re-checks the channels it can see and hides failures for 12 hours, and a channel that fails to play is removed immediately instead of the app silently jumping elsewhere.
+- **Clear schedule.** Previous / Now playing / Up next / Later, with explicit labels, times, countdowns, episode numbers, genre tags and descriptions. Schedule coverage went from about 35% to about 84% of channels by adding Samsung TV Plus, Plex and Roku listings.
+- **Languages.** English is the default, and viewers can add Filipino, Spanish, Portuguese, German, French, Italian, Hindi and others.
+- **Favorite shows, movies and stars.** Typo-tolerant autosuggest from the live schedule, with cast lists from Wikidata (CC0). My TV shows when picks air, and for picks that aren't on free TV it links to JustWatch.
+- **Captions removed** until channels provide reliable ones.
+
 ## 9. Delivery plan
 - **v1 (this build):** static site on GitHub Pages; 6-hourly Actions refresh; curation + source policy + health check; EPG for FAST channels; D-pad UI; onboarding; favorites; 3 reminders; BYO playlist; where-to-watch card.
-- **v1.1:** Cloudflare Pages mirror; QR launch; PWA install.
+- **v1.1 (done):** QR "open on another screen"; installable PWA; items in 8b. Still open: Cloudflare Pages mirror.
 - **v2:** Worker + D1 for cloud sync, Web Push, Telegram/Discord; Pro tier payments.

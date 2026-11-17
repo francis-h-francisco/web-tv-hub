@@ -36,7 +36,7 @@ test('curate filters and categorizes', () => {
       st('F.de', 'https://x.akamaized.net/en.m3u8', { feed: 'English' }),
     ],
     feeds: [feed('A.us', ['eng']), feed('B.us', ['eng']), feed('C.us', ['eng']), feed('D.us', ['eng']), feed('E.us', ['eng']),
-      feed('F.de', ['deu'], 'Deutsch', true), feed('F.de', ['eng'], 'English', false)],
+      feed('F.de', ['xxx'], 'Deutsch', true), feed('F.de', ['eng'], 'English', false)],
     blocklist: [], logos: [],
   };
   const { candidates } = curate(data, config);
@@ -63,4 +63,25 @@ test('xmltv parsing', () => {
   const r = parseXmltv(xml, new Set(['a']), 0, Infinity);
   assert.deepEqual(Object.keys(r), ['a']);
   assert.equal(r.a[0].t, 'Hi & Bye');
+});
+
+import { describeChannel, normTitle, genreLabel } from './lib.mjs';
+test('channel description and tags', () => {
+  const c = { name: 'Retro TV', country: 'US', tags: ['comedy'], streams: [{ source: 'fast' }] };
+  const H = 3600e3;
+  const progs = [
+    { s: 0, e: 2 * H, t: 'Frasier', g: ['Comedy', 'Sitcom'] },
+    { s: 2 * H, e: 3 * H, t: 'Wings', g: ['Comedy'] },
+    { s: 3 * H, e: 3.5 * H, t: 'Becker', g: ['Sitcom'] },
+  ];
+  const d = describeChannel(c, progs, null);
+  assert.equal(d.desc, 'Comedy and sitcom channel. Shows like Frasier, Wings and Becker.');
+  assert.deepEqual(d.tags, ['Comedy', 'Sitcom', 'Free with ads']);
+  assert.equal(describeChannel(c, progs, { desc: 'Official blurb.' }).desc, 'Official blurb.');
+});
+test('title normalization and genres', () => {
+  assert.equal(normTitle('Star Trek: The Next Generation (1987)'), 'star trek the next generation');
+  assert.equal(normTitle('Pokémon: Season 3'), 'pokemon');
+  assert.equal(genreLabel('Science fiction'), 'Sci-fi');
+  assert.equal(genreLabel('Series'), null);
 });

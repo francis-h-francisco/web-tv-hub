@@ -14,9 +14,20 @@ GitHub Actions (every 6 h)                         Browser (TV stick, phone, lap
                                      deploy to GitHub Pages
 ```
 
-- **`pipeline/`**: Node 22 script, no dependencies. Fetches iptv-org data, applies the rules in `config/curation.json` (blocklist, 6 categories, news caps, source policy, HTTPS only), then checks each stream's playlist, variant and first video segment, including CORS. It also merges XMLTV guide data and writes `site/data/*.json`, plus `report.json` with counts.
-- **`site/`**: the app. There's no build step. Uses arrow-key spatial navigation, Back/Esc handling (including webOS/Tizen key codes), and hls.js with a fallback to the browser's built-in HLS player. It skips dead channels and remembers them for 24 h. Profile, favorites, reminders and the personal playlist are stored in `localStorage` only.
-- **`config/curation.json`**: everything a curator changes: allowed and denied stream hosts, news channel choices, category mapping, guide sources and "where to watch" links. Push a change and the next run applies it.
+- **`pipeline/`**: Node 22, no dependencies. Every 6 hours it:
+  1. fetches iptv-org data and applies `config/curation.json` (blocklist, 6 categories, news caps, source policy, HTTPS only, languages);
+  2. health-checks every stream by fetching its playlist, variant playlist and a real video segment, and records whether the web player can read each step (CORS);
+  3. merges schedules from public Pluto TV, Samsung TV Plus, Plex and Roku listings, by stream ID or exact channel name, and only when the listing covers the current time;
+  4. adds official channel descriptions where the platform publishes them, and otherwise writes a factual one from the schedule ("Comedy and sitcom channel. Shows like Frasier, Wings and Becker.");
+  5. looks up cast lists on Wikidata for shows and movies on the schedule, matched by type, year and how well-known each work is, and caches results for 30 days;
+  6. writes `site/data/channels.json`, `site/data/epg/<language>.json`, `people.json` and `report.json`.
+- **`site/`**: the app, with no build step.
+  - **Layout:** on TV and desktop, the player and a Previous / Now playing / Up next / Later timeline sit on the left, and the category guide with now and next for every channel on the right. Phones get a sticky player, a calm list and a bottom tab bar.
+  - **Availability is checked on the viewer's device too.** The app quietly probes channels from the viewer's own network and removes any that fail, for example because of region locks. A channel that fails to play is removed from every list immediately.
+  - **Profile:** languages (English by default), favorite shows, movies and stars with typo-tolerant autosuggest ("fraiser" finds Frasier), kinds of TV, topics and era. **My TV** lists when your picks are on, plus reminders and favorites.
+  - **App features:** installable as an app with an offline shell, and a QR code to open the site on another screen. Captions are off because most channels don't provide reliable ones.
+  - **Privacy:** profile, favorites, reminders and the personal playlist are stored in `localStorage` only.
+- **`config/curation.json`**: everything a curator changes, including stream hosts, news channels, categories, languages, guide sources and "where to watch" links.
 
 ## Run locally
 

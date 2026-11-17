@@ -96,15 +96,17 @@ export function curate(data, config) {
         country: ch.country,
         category,
         tags: ch.categories,
-        languages: chLangs,
+        languages: [],
         website: ch.website || null,
         logo: logo.get(ch.id)?.url || null,
         streams: [],
       };
       out.set(ch.id, entry);
     }
+    for (const l of chLangs) if (!entry.languages.includes(l)) entry.languages.push(l);
     entry.streams.push({
       url: s.url,
+      lang: chLangs[0] || undefined,
       quality: s.quality || null,
       source,
       geoBlocked: s.labels.includes('Geo-blocked'),
@@ -114,7 +116,7 @@ export function curate(data, config) {
 
   for (const e of out.values()) {
     e.streams.sort((a, b) =>
-      (a.geoBlocked - b.geoBlocked) || (SOURCE_RANK[a.source] - SOURCE_RANK[b.source]) ||
+      (a.geoBlocked - b.geoBlocked) || ((a.lang === 'eng' ? 0 : 1) - (b.lang === 'eng' ? 0 : 1)) || (SOURCE_RANK[a.source] - SOURCE_RANK[b.source]) ||
       (a.not247 - b.not247) || (QUALITY(b.quality) - QUALITY(a.quality)));
   }
   return { candidates: [...out.values()], stats };
@@ -138,10 +140,24 @@ export function applyCaps(channels, config) {
   for (const cat of config.categoryMap) {
     const list = [...(byCat.get(cat.id) || [])];
     // PH first, then English 24/7 official sources
-    if (cat.id !== 'news') list.sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
-    result.push(...list.slice(0, cat.id === 'news' ? list.length : config.maxPerCategory));
+    if (cat.id === 'news') { result.push(...list); continue; }
+    list.sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
+    // cap per category *and* language so other languages don't crowd out English (the default)
+    const used = {};
+    for (const c of list) {
+      const lang = primaryLang(c, config);
+      const cap = lang === 'eng' || c.country === 'PH' ? config.maxPerCategory : (config.maxPerCategoryOtherLanguage || 15);
+      used[lang] = (used[lang] || 0) + 1;
+      if (used[lang] <= cap) result.push(c);
+    }
   }
   return result;
+}
+
+export function primaryLang(c, config) {
+  const l = c.languages || [];
+  if (l.includes('eng')) return 'eng';
+  return l.find((x) => config.languages.includes(x)) || l[0] || 'und';
 }
 
 function rankIn(arr, id) { const i = arr.indexOf(id); return i < 0 ? 999 : i; }
@@ -167,7 +183,14 @@ export function parseXmltv(xml, wanted, fromMs, toMs) {
     const title = decode(/<title[^>]*>([\s\S]*?)<\/title>/.exec(body)?.[1] || '');
     const sub = decode(/<sub-title[^>]*>([\s\S]*?)<\/sub-title>/.exec(body)?.[1] || '');
     const desc = decode(/<desc[^>]*>([\s\S]*?)<\/desc>/.exec(body)?.[1] || '');
-    (out[ch] ||= []).push({ s: start, e: stop, t: title, st: sub || undefined, d: desc.slice(0, 280) || undefined });
+    const cats = [...body.matchAll(/<category[^>]*>([\s\S]*?)<\/category>/g)].map((x) => decode(x[1]).toLowerCase());
+    const kind = cats.some((c) => c.includes('movie') || c.includes('film')) ? 'movie' : cats.some((c) => c.includes('series') || c.includes('episode')) ? 'series' : undefined;
+    const year = parseInt(/<date>(\d{4})/.exec(body)?.[1] || '', 10) || undefined;
+    const ep = /<episode-num system="onscreen">([^<]+)<\/episode-num>/.exec(body)?.[1];
+    const genres = [...new Set(cats.map(genreLabel).filter(Boolean))].slice(0, 3);
+    if (!title) continue;
+    (out[ch] ||= []).push({ s: start, e: stop, t: title, st: sub || undefined, d: desc.slice(0, 280) || undefined, c: kind,
+      y: kind === 'movie' ? year : undefined, ep: ep || undefined, g: genres.length ? genres : undefined });
   }
   for (const k of Object.keys(out)) out[k].sort((a, b) => a.s - b.s);
   return out;
@@ -188,3 +211,86 @@ function decode(s) {
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n)).replace(/&amp;/g, '&').trim();
 }
+
+export function parseXmltvChannels(xml) {
+  const out = [];
+  const re = /<channel\b[^>]*\bid="([^"]+)"[^>]*>([\s\S]*?)<\/channel>/g;
+  let m;
+  while ((m = re.exec(xml))) {
+    const name = decode(/<display-name[^>]*>([\s\S]*?)<\/display-name>/.exec(m[2])?.[1] || '');
+    if (name) out.push({ id: m[1], name });
+  }
+  return out;
+}
+
+/** Channel names: "The Pet Collective HD" and "Pet Collective" compare equal. */
+export function normName(s) {
+  return fold(s).replace(/\b(the|tv|channel|hd|uhd|4k|network|en|english)\b/g, '').replace(/[^a-z0-9]/g, '');
+}
+
+/** Programme titles: drop year and season suffixes, fold accents and punctuation. */
+export function normTitle(s) {
+  return fold(cleanTitle(s)).replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+export function cleanTitle(t) {
+  return String(t || '').replace(/\s*\((19|20)\d\d\)\s*$/, '').replace(/\s*[:\-–]\s*(season|series)\s*\d+.*$/i, '').trim();
+}
+
+function fold(s) {
+  return String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, ' and ');
+}
+
+const GENERIC = new Set(['series', 'movie', 'movies', 'film', 'episode', 'entertainment', 'tvshow', 'tv show', 'show', 'other', 'unknown', 'general']);
+const GENRE_ALIASES = {
+  'news & information': 'News', 'children': 'Kids', 'kids & family': 'Kids', 'animated': 'Animation', 'anime series': 'Anime',
+  'anime action & adventure': 'Anime', 'science fiction': 'Sci-fi', 'sci-fi & fantasy': 'Sci-fi', 'late night comedies': 'Late-night comedy',
+  'home & lifestyle': 'Lifestyle', 'food & cooking': 'Food', 'competition reality': 'Competition', 'human interest': 'Real stories',
+  'screwball': 'Comedy', 'sitcom': 'Sitcom', 'sitcoms': 'Sitcom', 'true crime': 'True crime',
+};
+export function genreLabel(c) {
+  const k = String(c || '').trim().toLowerCase();
+  if (!k || GENERIC.has(k) || k.length > 28) return null;
+  if (GENRE_ALIASES[k]) return GENRE_ALIASES[k];
+  return k.replace(/\b\w/g, (x) => x.toUpperCase());
+}
+
+const CAT_TAG = {
+  animation: 'Animation', kids: 'Kids', comedy: 'Comedy', movies: 'Movies', series: 'Series', classic: 'Classic TV',
+  sports: 'Sports', news: 'News', entertainment: 'Entertainment', documentary: 'Documentary', family: 'Family',
+  music: 'Music', lifestyle: 'Lifestyle', cooking: 'Food', travel: 'Travel', outdoor: 'Outdoors', science: 'Science',
+  business: 'Business', culture: 'Culture', auto: 'Cars', weather: 'Weather', education: 'Learning',
+};
+
+/** Short, factual channel description + tags. Uses the platform's own blurb when we have one. */
+export function describeChannel(c, programmes = [], meta = null) {
+  const genreCount = new Map();
+  const titleTime = new Map();
+  for (const p of programmes) {
+    const mins = (p.e - p.s) / 60000;
+    for (const g of p.g || []) genreCount.set(g, (genreCount.get(g) || 0) + mins);
+    titleTime.set(p.t, (titleTime.get(p.t) || 0) + mins);
+  }
+  const topGenres = [...genreCount.entries()].sort((a, b) => b[1] - a[1]).map((x) => x[0]).slice(0, 3);
+  const topTitles = [...titleTime.entries()].sort((a, b) => b[1] - a[1]).map((x) => x[0]).slice(0, 3);
+
+  const tags = [];
+  for (const t of c.tags || []) if (CAT_TAG[t]) tags.push(CAT_TAG[t]);
+  for (const g of topGenres) if (!tags.some((t) => t.toLowerCase() === g.toLowerCase())) tags.push(g);
+  const s = c.streams?.[0] || {};
+  if (s.source === 'fast') tags.push('Free with ads');
+  if (s.not247) tags.push('Not 24/7');
+
+  let desc = meta?.desc || '';
+  if (!desc) {
+    const kind = topGenres.length ? joinWords(topGenres.slice(0, 2).map((g) => g.toLowerCase())) : (CAT_TAG[(c.tags || [])[0]] || 'Live').toLowerCase();
+    const where = c.country === 'PH' ? ' from the Philippines' : '';
+    desc = cap(kind) + ' channel' + where + '.';
+    if (topTitles.length > 1) desc += ' Shows like ' + joinWords(topTitles) + '.';
+    else if (topTitles.length === 1 && topTitles[0].toLowerCase() !== c.name.toLowerCase()) desc += ' Mostly ' + topTitles[0] + '.';
+  }
+  return { desc, tags: [...new Set(tags)].slice(0, 5) };
+}
+
+function joinWords(a) { return a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }

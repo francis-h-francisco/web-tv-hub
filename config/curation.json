@@ -4,7 +4,22 @@
   "languages": [
     "eng",
     "fil",
-    "tgl"
+    "tgl",
+    "spa",
+    "por",
+    "fra",
+    "deu",
+    "ita",
+    "jpn",
+    "kor",
+    "hin",
+    "ara",
+    "zho",
+    "cmn",
+    "ind",
+    "msa",
+    "vie",
+    "tha"
   ],
   "alwaysIncludeCountries": [
     "PH"
@@ -134,7 +149,7 @@
   },
   "denyChannels": [],
   "health": {
-    "timeoutMs": 9000,
+    "timeoutMs": 12000,
     "concurrency": 24,
     "maxStreamsTriedPerChannel": 3,
     "requireCors": true
@@ -144,14 +159,35 @@
     "futureHours": 26,
     "sources": [
       {
-        "name": "PlutoTV",
+        "name": "Pluto TV",
         "url": "https://i.mjh.nz/PlutoTV/all.xml.gz",
-        "streamPattern": "^https://jmp2\\.uk/plu-([0-9a-f]+)"
+        "streamPattern": "^https://jmp2\\.uk/plu-([0-9a-f]+)",
+        "channelsUrl": "https://i.mjh.nz/PlutoTV/.channels.json"
       },
       {
-        "name": "SamsungTVPlus",
+        "name": "Samsung TV Plus",
         "url": "https://i.mjh.nz/SamsungTVPlus/all.xml.gz",
-        "streamPattern": "^https://jmp2\\.uk/stvp-([A-Za-z0-9]+)"
+        "streamPattern": "^https://jmp2\\.uk/stvp-([A-Za-z0-9]+)",
+        "matchByName": true,
+        "channelsUrl": "https://i.mjh.nz/SamsungTVPlus/.channels.json"
+      },
+      {
+        "name": "Plex",
+        "url": "https://i.mjh.nz/Plex/all.xml.gz",
+        "matchByName": true,
+        "channelsUrl": "https://i.mjh.nz/Plex/.channels.json"
+      },
+      {
+        "name": "Roku",
+        "url": "https://i.mjh.nz/Roku/all.xml.gz",
+        "matchByName": true,
+        "channelsUrl": "https://i.mjh.nz/Roku/.channels.json"
+      },
+      {
+        "name": "Pluto TV (by name)",
+        "url": "https://i.mjh.nz/PlutoTV/all.xml.gz",
+        "matchByName": true,
+        "channelsUrl": "https://i.mjh.nz/PlutoTV/.channels.json"
       }
     ]
   },
@@ -220,5 +256,12 @@
         }
       ]
     }
-  ]
+  ],
+  "people": {
+    "enabled": true,
+    "maxTitles": 2500,
+    "batch": 40,
+    "castPerTitle": 8
+  },
+  "maxPerCategoryOtherLanguage": 15
 }
