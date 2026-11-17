@@ -38,6 +38,12 @@ jobs:
           restore-keys: people-
       - name: Fetch, curate, health-check and build guide data
         run: node pipeline/build.mjs --out site/data
+      - name: Latest Android app release (served from our own site, so the download page needs no GitHub API call)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=20" --jq '[.[] | select((.tag_name|startswith("app-v")) and (.draft|not))][0] // {} | {tag_name, published_at, body, assets: [(.assets // [])[] | {name, size, browser_download_url}]}' > site/data/app-release.json || echo '{}' > site/data/app-release.json
+          head -c 300 site/data/app-release.json; echo
       - name: Sanity check output
         run: |
           node -e "const d=require('./site/data/channels.json'); if (d.channels.length < 100) { console.error('Only', d.channels.length, 'channels - refusing to deploy'); process.exit(1) } console.log(d.channels.length, 'channels')"

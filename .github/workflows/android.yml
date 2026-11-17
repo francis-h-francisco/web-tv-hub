@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: android
@@ -122,3 +123,5 @@ jobs:
           - Built from commit $GITHUB_SHA by GitHub Actions: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
           - Check it yourself: https://www.virustotal.com/gui/file/$SHA"
           gh release create "$TAG" web-tv-hub.apk scan.json --title "Android app $VERSION" --notes "$NOTES" --latest=false
+          # refresh the site so the download page shows this build right away
+          gh workflow run refresh-and-deploy.yml --ref main || echo 'site refresh not triggered'

@@ -77,8 +77,11 @@ if (location.hostname === 'francis-h-francisco.github.io') location.replace('htt
   const mb = (n) => (n / 1048576).toFixed(1) + ' MB';
   const when = (iso) => new Date(iso).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
   const rel = document.getElementById('release'), checks = document.getElementById('checks');
-  fetch('https://api.github.com/repos/francis-h-francisco/web-tv-hub/releases?per_page=20', { headers: { Accept: 'application/vnd.github+json' } })
-    .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+  // Release info is published with the site (data/app-release.json); GitHub's API is only a fallback.
+  const fromSite = () => fetch('data/app-release.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).then((j) => (j && j.tag_name ? [j] : null));
+  const fromGitHub = () => fetch('https://api.github.com/repos/francis-h-francisco/web-tv-hub/releases?per_page=20', { headers: { Accept: 'application/vnd.github+json' } })
+    .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+  fromSite().catch(() => null).then((l) => l || fromGitHub())
     .then(async (list) => {
       const r = list.find((x) => /^app-v/.test(x.tag_name) && !x.draft);
       if (!r) throw new Error('no build yet');
@@ -101,7 +104,7 @@ if (location.hostname === 'francis-h-francisco.github.io') location.replace('htt
       document.getElementById('updateNote').textContent = scan && scan.signing === 'debug' ? 'Updating: uninstall the previous version first. Your profile, favorites and reminders in the app reset when you do.' : '';
     })
     .catch((e) => {
-      rel.innerHTML = '<h2>Coming soon</h2><p class="muted">The first Android build is being prepared. Check back shortly. (' + esc(e.message) + ')</p>';
+      rel.innerHTML = '<h2>Download</h2><p class="muted">We couldn\'t load the latest version here. You can get it from the releases page instead.</p><a class="btn primary big" target="_blank" rel="noopener" href="https://github.com/francis-h-francisco/web-tv-hub/releases">Open the releases page</a>';
       checks.innerHTML = '<p class="muted">Scan results appear here with each build.</p>';
     });
 })();
