@@ -3,7 +3,7 @@ name: Android app (build, scan, publish)
 on:
   push:
     branches: [main]
-    paths: ['app/**', '.github/workflows/android.yml', 'site/icon-512.png']
+    paths: ['app/**', '.github/workflows/android.yml', 'site/icon-512.png', 'site/icon.svg']
   workflow_dispatch:
 
 permissions:
@@ -57,7 +57,7 @@ jobs:
           for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
             name=${d%%:*}; px=${d##*:}
             convert site/icon-512.png -resize ${px}x${px} $RES/mipmap-$name/ic_launcher.png
-            convert site/icon-512.png -resize ${px}x${px} $RES/mipmap-$name/ic_launcher_round.png
+            convert app/icon-round-512.png -resize ${px}x${px} $RES/mipmap-$name/ic_launcher_round.png
             mkdir -p $RES/drawable-$name
             rsvg-convert -w $((px/2)) -h $((px/2)) app/notification-icon.svg -o $RES/drawable-$name/ic_stat_tv.png
           done

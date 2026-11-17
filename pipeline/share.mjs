@@ -4,6 +4,7 @@
 // lets you share). Show links "expire": once the show has ended the page says so and points to what's on now,
 // and after the next 6-hourly refresh the page is gone (404.html then sends visitors to the app).
 import { mkdir, writeFile, readFile, readdir, unlink, copyFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { Resvg } from '@resvg/resvg-js';
 import sharp from 'sharp';
@@ -14,6 +15,9 @@ const run = promisify(execFile);
 const FONT_DIR = new URL('./fonts/', import.meta.url).pathname;
 const FONTS = ['Inter-Regular.otf', 'Inter-Bold.otf', 'Inter-ExtraBold.otf'].map((f) => FONT_DIR + f);
 const W = 1200, H = 630;
+// the site logo (site/icon.svg), drawn inside cards at any position and size
+const LOGO = (() => { try { return readFileSync(new URL('../site/icon.svg', import.meta.url), 'utf8').replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, ''); } catch { return ''; } })();
+const logoMark = (x, y, size) => LOGO ? `<svg x="${x}" y="${y}" width="${size}" height="${size}" viewBox="0 0 512 512">${LOGO}</svg>` : `<circle cx="${x + size / 2}" cy="${y + size / 2}" r="${size / 4}" fill="#ff5a5f"/>`;
 
 const xml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
 const html = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -71,7 +75,7 @@ function cardSvg(ch, logo, catName) {
   <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#151a26"/><stop offset="1" stop-color="#0b0d12"/></linearGradient>
   <clipPath id="lc"><rect x="70" y="150" width="380" height="250" rx="28"/></clipPath></defs>
   <rect width="${W}" height="${H}" fill="url(#g)"/>
-  <rect x="0" y="0" width="${W}" height="10" fill="#ff5a5f"/>
+  <rect x="0" y="0" width="${W}" height="10" fill="#ff6a5f"/>
   <rect x="70" y="150" width="380" height="250" rx="28" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.12"/>
   ${logo ? `<image x="100" y="175" width="320" height="200" preserveAspectRatio="xMidYMid meet" xlink:href="${logo}" clip-path="url(#lc)"/>`
     : `<text x="260" y="300" text-anchor="middle" font-family="Inter" font-weight="800" font-size="96" fill="#98a2b3">${initials}</text>`}
@@ -79,8 +83,8 @@ function cardSvg(ch, logo, catName) {
   <text x="532" y="180" font-family="Inter" font-weight="800" font-size="22" fill="#fff" letter-spacing="2">● FREE LIVE TV${catName ? ' · ' + xml(catName.toUpperCase()) : ''}</text>
   ${name.map((l, i) => `<text x="510" y="${262 + i * 66}" font-family="Inter" font-weight="800" font-size="58" fill="#eef1f6">${xml(l)}</text>`).join('\n  ')}
   ${desc.map((l, i) => `<text x="510" y="${262 + name.length * 66 + 12 + i * 36}" font-family="Inter" font-size="27" fill="#98a2b3">${xml(l)}</text>`).join('\n  ')}
-  <circle cx="92" cy="${H - 70}" r="12" fill="#ff5a5f"/>
-  <text x="116" y="${H - 60}" font-family="Inter" font-weight="800" font-size="30" fill="#eef1f6">Web TV Hub</text>
+  ${logoMark(70, H - 102, 48)}
+  <text x="130" y="${H - 66}" font-family="Inter" font-weight="800" font-size="30" fill="#eef1f6">Web TV Hub</text>
   <text x="${W - 70}" y="${H - 60}" text-anchor="end" font-family="Inter" font-size="26" fill="#ffb347">Watch free · no sign-up</text>
 </svg>`;
 }
@@ -106,8 +110,8 @@ function showCardSvg(ch, logo, p) {
   <rect x="70" y="440" width="190" height="120" rx="18" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.12"/>
   ${logo ? `<image x="85" y="452" width="160" height="96" preserveAspectRatio="xMidYMid meet" xlink:href="${logo}" clip-path="url(#lc)"/>`
     : `<text x="165" y="515" text-anchor="middle" font-family="Inter" font-weight="800" font-size="44" fill="#98a2b3">${initials}</text>`}
-  <circle cx="${W - 330}" cy="${H - 70}" r="12" fill="#ff5a5f"/>
-  <text x="${W - 306}" y="${H - 60}" font-family="Inter" font-weight="800" font-size="30" fill="#eef1f6">Web TV Hub</text>
+  ${logoMark(W - 322, H - 98, 44)}
+  <text x="${W - 70}" y="${H - 64}" text-anchor="end" font-family="Inter" font-weight="800" font-size="30" fill="#eef1f6">Web TV Hub</text>
   <text x="${W - 70}" y="${H - 105}" text-anchor="end" font-family="Inter" font-size="26" fill="#ffb347">Watch free · no sign-up</text>
 </svg>`;
 }
@@ -120,9 +124,9 @@ function homeCardSvg(count, cats, logos) {
   <defs><radialGradient id="g" cx=".2" cy="0" r="1.2"><stop offset="0" stop-color="#2a1517"/><stop offset=".55" stop-color="#121622"/><stop offset="1" stop-color="#0b0d12"/></radialGradient>
   ${strip.map((_, i) => `<clipPath id="c${i}"><rect x="${x0 + i * (cw + gap)}" y="420" width="${cw}" height="104" rx="16"/></clipPath>`).join('')}</defs>
   <rect width="${W}" height="${H}" fill="url(#g)"/>
-  <rect x="0" y="0" width="${W}" height="10" fill="#ff5a5f"/>
-  <circle cx="86" cy="86" r="16" fill="#ff5a5f"/>
-  <text x="116" y="98" font-family="Inter" font-weight="800" font-size="36" fill="#eef1f6">Web TV Hub</text>
+  <rect x="0" y="0" width="${W}" height="10" fill="#ff6a5f"/>
+  ${logoMark(66, 50, 66)}
+  <text x="148" y="97" font-family="Inter" font-weight="800" font-size="38" fill="#eef1f6">Web TV Hub</text>
   <text x="70" y="215" font-family="Inter" font-weight="800" font-size="74" fill="#eef1f6">Free live TV.</text>
   <text x="70" y="295" font-family="Inter" font-weight="800" font-size="74" fill="#ffb347">No sign-up, no fees.</text>
   <text x="70" y="358" font-family="Inter" font-size="30" fill="#98a2b3">${xml(count + ' channels · ' + cats)}</text>
@@ -145,13 +149,13 @@ function appCardSvg() {
   ${pts.map((t, i) => `<circle cx="84" cy="${368 + i * 54}" r="8" fill="#3ddc84"/><text x="108" y="${378 + i * 54}" font-family="Inter" font-size="29" fill="#c9ced8">${xml(t)}</text>`).join('\n  ')}
   <rect x="860" y="70" width="250" height="490" rx="38" fill="#0b0d12" stroke="#2b3345" stroke-width="6"/>
   <rect x="878" y="130" width="214" height="120" rx="10" fill="#1b2130"/>
-  <polygon points="970,165 970,215 1010,190" fill="#ffb347"/>
+  ${logoMark(950, 140, 70)}
   <rect x="878" y="270" width="214" height="60" rx="10" fill="#2a1517" stroke="#ff5a5f" stroke-width="3"/>
   <rect x="892" y="285" width="90" height="12" rx="6" fill="#ff5a5f"/><rect x="892" y="305" width="150" height="10" rx="5" fill="#556"/>
   <rect x="878" y="345" width="214" height="50" rx="10" fill="#1b2130"/><rect x="878" y="405" width="214" height="50" rx="10" fill="#1b2130"/>
   <circle cx="985" cy="510" r="22" fill="#1b2130"/>
-  <circle cx="92" cy="${H - 50}" r="12" fill="#ff5a5f"/>
-  <text x="116" y="${H - 40}" font-family="Inter" font-size="26" fill="#98a2b3">webtv-hub.pages.dev/download</text>
+  ${logoMark(70, H - 76, 38)}
+  <text x="122" y="${H - 48}" font-family="Inter" font-size="26" fill="#98a2b3">webtv-hub.pages.dev/download</text>
 </svg>`;
 }
 
