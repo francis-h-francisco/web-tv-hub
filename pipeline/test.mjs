@@ -105,3 +105,23 @@ test('share page script is valid JavaScript', () => {
   assert.doesNotThrow(() => new vm.Script(SHARE_JS));
   assert.equal(slug('Foo Bar.us'), 'Foo_Bar.us');
 });
+
+test('share pages carry previews and valid structured data', async () => {
+  const { buildShare } = await import('./share.mjs');
+  const { mkdtemp, readFile: rf } = await import('node:fs/promises');
+  const dir = await mkdtemp('/tmp/wth-share-');
+  const now = Date.now();
+  const chans = [{ id: 'Test.us', name: 'Test <TV>', category: 'series', lang: 'eng', desc: 'A "test" channel', logo: null }];
+  const epg = { 'Test.us': [{ s: now - 6e5, e: now + 6e5, t: 'Show & Tell', d: 'Episode </script> one' }] };
+  await buildShare(chans, epg, [{ id: 'series', name: 'TV Series' }], { outDir: dir, siteUrl: 'https://x.test/' }, () => {});
+  const ch = await rf(`${dir}/s/Test.us.html`, 'utf8');
+  const show = await rf(`${dir}/s/Test.us/${Math.round((now - 6e5) / 60000)}.html`, 'utf8');
+  for (const page of [ch, show]) {
+    assert.match(page, /og:image" content="https:\/\/x\.test\//);
+    const json = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(page);
+    assert.ok(json, 'has JSON-LD'); JSON.parse(json[1]);
+  }
+  assert.match(show, /"@type":"BroadcastEvent"/);
+  assert.match(show, /og:image" content="https:\/\/x\.test\/s\/Test\.us\/show-tell\.jpg"/);
+  assert.match(await rf(`${dir}/sitemap.xml`, 'utf8'), /<loc>https:\/\/x\.test\/s\/Test\.us\.html<\/loc>/);
+});

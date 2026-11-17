@@ -3,3 +3,6 @@ site/data/
 .DS_Store
 .cache/
 site/s/
+site/og/
+site/sitemap.xml
+site/robots.txt

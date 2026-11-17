@@ -3,7 +3,8 @@
 // static page: one per channel, plus one per show that is on now or coming up next (the shows the app
 // lets you share). Show links "expire": once the show has ended the page says so and points to what's on now,
 // and after the next 6-hourly refresh the page is gone (404.html then sends visitors to the app).
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, readdir, unlink, copyFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { Resvg } from '@resvg/resvg-js';
 import sharp from 'sharp';
 import { execFile } from 'node:child_process';
@@ -84,8 +85,88 @@ function cardSvg(ch, logo, catName) {
 </svg>`;
 }
 
-function page({ url, img, title, desc, ch, prog, depth, noindex }) {
+// A show's own card: its title is the headline, the channel is the byline. No air time on the image
+// (viewers are in different time zones); the page itself shows the local time.
+function showCardSvg(ch, logo, p) {
+  const title = wrap(p.t, 24, 2);
+  const extra = [p.ep, p.st].filter(Boolean).join(' · ');
+  const sub = wrap(extra || p.d || ch.desc || '', 48, extra ? 1 : 2);
+  const label = 'ON ' + ch.name.toUpperCase();
+  const pill = label.length > 30 ? label.slice(0, 29) + '…' : label;
+  const initials = xml(ch.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 3));
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1d1420"/><stop offset="1" stop-color="#0b0d12"/></linearGradient>
+  <clipPath id="lc"><rect x="70" y="440" width="190" height="120" rx="18"/></clipPath></defs>
+  <rect width="${W}" height="${H}" fill="url(#g)"/>
+  <rect x="0" y="0" width="${W}" height="10" fill="#ffb347"/>
+  <rect x="70" y="80" rx="22" width="${Math.round(44 + ('▶ ' + pill).length * 16.5)}" height="44" fill="#ffb347"/>
+  <text x="92" y="110" font-family="Inter" font-weight="800" font-size="22" fill="#1a1206" letter-spacing="2">▶ ${xml(pill)}</text>
+  ${title.map((l, i) => `<text x="70" y="${215 + i * 78}" font-family="Inter" font-weight="800" font-size="68" fill="#eef1f6">${xml(l)}</text>`).join('\n  ')}
+  ${sub.map((l, i) => `<text x="70" y="${215 + title.length * 78 + 4 + i * 38}" font-family="Inter" font-size="29" fill="#98a2b3">${xml(l)}</text>`).join('\n  ')}
+  <rect x="70" y="440" width="190" height="120" rx="18" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.12"/>
+  ${logo ? `<image x="85" y="452" width="160" height="96" preserveAspectRatio="xMidYMid meet" xlink:href="${logo}" clip-path="url(#lc)"/>`
+    : `<text x="165" y="515" text-anchor="middle" font-family="Inter" font-weight="800" font-size="44" fill="#98a2b3">${initials}</text>`}
+  <circle cx="${W - 330}" cy="${H - 70}" r="12" fill="#ff5a5f"/>
+  <text x="${W - 306}" y="${H - 60}" font-family="Inter" font-weight="800" font-size="30" fill="#eef1f6">Web TV Hub</text>
+  <text x="${W - 70}" y="${H - 105}" text-anchor="end" font-family="Inter" font-size="26" fill="#ffb347">Watch free · no sign-up</text>
+</svg>`;
+}
+
+// Homepage card: live channel count and a strip of real channel logos.
+function homeCardSvg(count, cats, logos) {
+  const strip = logos.slice(0, 6);
+  const cw = 165, gap = 18, x0 = (W - (strip.length * cw + (strip.length - 1) * gap)) / 2;
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <defs><radialGradient id="g" cx=".2" cy="0" r="1.2"><stop offset="0" stop-color="#2a1517"/><stop offset=".55" stop-color="#121622"/><stop offset="1" stop-color="#0b0d12"/></radialGradient>
+  ${strip.map((_, i) => `<clipPath id="c${i}"><rect x="${x0 + i * (cw + gap)}" y="420" width="${cw}" height="104" rx="16"/></clipPath>`).join('')}</defs>
+  <rect width="${W}" height="${H}" fill="url(#g)"/>
+  <rect x="0" y="0" width="${W}" height="10" fill="#ff5a5f"/>
+  <circle cx="86" cy="86" r="16" fill="#ff5a5f"/>
+  <text x="116" y="98" font-family="Inter" font-weight="800" font-size="36" fill="#eef1f6">Web TV Hub</text>
+  <text x="70" y="215" font-family="Inter" font-weight="800" font-size="74" fill="#eef1f6">Free live TV.</text>
+  <text x="70" y="295" font-family="Inter" font-weight="800" font-size="74" fill="#ffb347">No sign-up, no fees.</text>
+  <text x="70" y="358" font-family="Inter" font-size="30" fill="#98a2b3">${xml(count + ' channels · ' + cats)}</text>
+  ${strip.map((l, i) => `<rect x="${x0 + i * (cw + gap)}" y="420" width="${cw}" height="104" rx="16" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.12"/>
+  <image x="${x0 + i * (cw + gap) + 14}" y="432" width="${cw - 28}" height="80" preserveAspectRatio="xMidYMid meet" xlink:href="${l}" clip-path="url(#c${i})"/>`).join('\n  ')}
+  <text x="${W / 2}" y="580" text-anchor="middle" font-family="Inter" font-size="26" fill="#98a2b3">Works on TVs, phones and computers · webtv-hub.pages.dev</text>
+</svg>`;
+}
+
+function appCardSvg() {
+  const pts = ['Show reminders, even when the app is closed', 'Your phone becomes the TV remote', 'Free, small, no account'];
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#151a26"/><stop offset="1" stop-color="#0b0d12"/></linearGradient></defs>
+  <rect width="${W}" height="${H}" fill="url(#g)"/>
+  <rect x="0" y="0" width="${W}" height="10" fill="#3ddc84"/>
+  <rect x="70" y="80" rx="22" width="250" height="44" fill="#3ddc84"/>
+  <text x="92" y="110" font-family="Inter" font-weight="800" font-size="22" fill="#08210f" letter-spacing="2">ANDROID APP</text>
+  <text x="70" y="220" font-family="Inter" font-weight="800" font-size="66" fill="#eef1f6">Web TV Hub</text>
+  <text x="70" y="290" font-family="Inter" font-weight="800" font-size="66" fill="#eef1f6">for Android</text>
+  ${pts.map((t, i) => `<circle cx="84" cy="${368 + i * 54}" r="8" fill="#3ddc84"/><text x="108" y="${378 + i * 54}" font-family="Inter" font-size="29" fill="#c9ced8">${xml(t)}</text>`).join('\n  ')}
+  <rect x="860" y="70" width="250" height="490" rx="38" fill="#0b0d12" stroke="#2b3345" stroke-width="6"/>
+  <rect x="878" y="130" width="214" height="120" rx="10" fill="#1b2130"/>
+  <polygon points="970,165 970,215 1010,190" fill="#ffb347"/>
+  <rect x="878" y="270" width="214" height="60" rx="10" fill="#2a1517" stroke="#ff5a5f" stroke-width="3"/>
+  <rect x="892" y="285" width="90" height="12" rx="6" fill="#ff5a5f"/><rect x="892" y="305" width="150" height="10" rx="5" fill="#556"/>
+  <rect x="878" y="345" width="214" height="50" rx="10" fill="#1b2130"/><rect x="878" y="405" width="214" height="50" rx="10" fill="#1b2130"/>
+  <circle cx="985" cy="510" r="22" fill="#1b2130"/>
+  <circle cx="92" cy="${H - 50}" r="12" fill="#ff5a5f"/>
+  <text x="116" y="${H - 40}" font-family="Inter" font-size="26" fill="#98a2b3">webtv-hub.pages.dev/download</text>
+</svg>`;
+}
+
+const ld = (o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`;
+
+function page({ url, img, title, desc, ch, prog, depth, noindex, siteUrl }) {
   const up = '../'.repeat(depth);
+  const service = { '@type': 'BroadcastService', name: ch.name, description: ch.desc || undefined, logo: ch.logo || undefined,
+    inLanguage: ch.lang || undefined, url: `${siteUrl}?ch=${encodeURIComponent(ch.id)}`,
+    broadcaster: { '@type': 'Organization', name: ch.network || ch.name } };
+  const data_ld = prog
+    ? { '@context': 'https://schema.org', '@type': 'BroadcastEvent', name: prog.t, description: prog.d || undefined,
+        startDate: new Date(prog.s).toISOString(), endDate: new Date(prog.e).toISOString(), isLiveBroadcast: true, image: img,
+        isAccessibleForFree: true, publishedOn: service, url }
+    : { '@context': 'https://schema.org', ...service, image: img, isAccessibleForFree: true, mainEntityOfPage: url };
   const data = html(JSON.stringify({ ch: ch.id, name: ch.name, s: prog ? prog.s : null, e: prog ? prog.e : null }));
   return `<!DOCTYPE html>
 <html lang="en"><head>
@@ -93,13 +174,14 @@ function page({ url, img, title, desc, ch, prog, depth, noindex }) {
 <title>${html(title)}</title>
 <meta name="description" content="${html(desc)}">
 ${noindex ? '<meta name="robots" content="noindex">\n' : ''}<link rel="canonical" href="${html(url)}">
-<meta property="og:type" content="website"><meta property="og:site_name" content="Web TV Hub">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Web TV Hub"><meta property="og:locale" content="en_US">
 <meta property="og:title" content="${html(title)}"><meta property="og:description" content="${html(desc)}">
 <meta property="og:url" content="${html(url)}"><meta property="og:image" content="${html(img)}">
-<meta property="og:image:width" content="${W}"><meta property="og:image:height" content="${H}"><meta property="og:image:alt" content="${html(ch.name)} on Web TV Hub">
+<meta property="og:image:type" content="image/jpeg"><meta property="og:image:width" content="${W}"><meta property="og:image:height" content="${H}"><meta property="og:image:alt" content="${html(prog ? prog.t + ' on ' + ch.name : ch.name + ' on Web TV Hub')}">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${html(title)}">
 <meta name="twitter:description" content="${html(desc)}"><meta name="twitter:image" content="${html(img)}">
 <meta name="theme-color" content="#0b0d12"><link rel="icon" href="${up}icon.svg"><link rel="stylesheet" href="${up}s/share.css">
+${ld(data_ld)}
 </head><body data-d="${data}" data-up="${up}"><div class="c"><img src="${html(img)}" alt=""><div class="b">
 <span class="p" id="pill">${prog ? 'Show' : 'Live channel'}</span><h1>${html(prog ? prog.t : ch.name)}</h1>
 <p class="m" id="when">${html(prog ? 'On ' + ch.name : ch.desc || '')}</p>${prog && prog.d ? `<p class="m">${html(prog.d)}</p>` : ''}
@@ -124,7 +206,7 @@ go.textContent='\uD83D\uDD14 Remind me \u00B7 watch on '+D.name;go.href=up+'?ch=
 
 export { SHARE_JS };
 
-export async function buildShare(channels, epg, categories, { outDir, siteUrl, windowHours = 9 }, log) {
+export async function buildShare(channels, epg, categories, { outDir, siteUrl, windowHours = 9, cacheRoot = null }, log) {
   const sdir = `${outDir}/s`;
   await mkdir(`${sdir}/img`, { recursive: true });
   await writeFile(`${sdir}/share.css`, SHARE_CSS);
@@ -132,7 +214,23 @@ export async function buildShare(channels, epg, categories, { outDir, siteUrl, w
   const fontBuffers = await Promise.all(FONTS.map((f) => readFile(f)));
   const catName = Object.fromEntries(categories.map((c) => [c.id, c.name]));
   const now = Date.now();
-  let cards = 0, shows = 0, logos = 0;
+  let cards = 0, shows = 0, logos = 0, showCards = 0;
+  const logoById = new Map();
+  // Drawing a card takes ~0.2 s, so finished cards are kept in .cache/cards (kept between runs) and
+  // reused whenever the card's content is unchanged. Cards not used in this run are deleted.
+  const cacheDir = cacheRoot ? `${cacheRoot}/cards` : null;
+  if (cacheDir) await mkdir(cacheDir, { recursive: true });
+  const used = new Set(); let reused = 0;
+  const render = async (svg, file) => {
+    const key = createHash('sha1').update(svg).digest('hex');
+    used.add(key + '.jpg');
+    if (cacheDir) { try { await copyFile(`${cacheDir}/${key}.jpg`, file); reused++; return; } catch { /* not cached yet */ } }
+    const png = new Resvg(svg, { font: { fontBuffers, loadSystemFonts: false, defaultFontFamily: 'Inter' }, fitTo: { mode: 'width', value: W } }).render().asPng();
+    const jpg = await sharp(png).jpeg({ quality: 80, mozjpeg: true }).toBuffer();
+    await writeFile(file, jpg);
+    if (cacheDir) await writeFile(`${cacheDir}/${key}.jpg`, jpg).catch(() => {});
+  };
+  const showKey = (t) => String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'show';
   let i = 0;
   const work = channels.slice();
   const worker = async () => {
@@ -140,18 +238,12 @@ export async function buildShare(channels, epg, categories, { outDir, siteUrl, w
       const ch = work[i++];
       const id = slug(ch.id);
       const logo = await logoDataUri(ch.logo);
-      if (logo) logos++;
-      try {
-        const png = new Resvg(cardSvg(ch, logo, catName[ch.category]), { font: { fontBuffers, loadSystemFonts: false, defaultFontFamily: 'Inter' }, fitTo: { mode: 'width', value: W } }).render().asPng();
-        await writeFile(`${sdir}/img/${id}.jpg`, await sharp(png).jpeg({ quality: 80, mozjpeg: true }).toBuffer()); cards++;
-      } catch (e) {
-        // a broken logo shouldn't cost the channel its card
-        const png = new Resvg(cardSvg(ch, null, catName[ch.category]), { font: { fontBuffers, loadSystemFonts: false, defaultFontFamily: 'Inter' } }).render().asPng();
-        await writeFile(`${sdir}/img/${id}.jpg`, await sharp(png).jpeg({ quality: 80, mozjpeg: true }).toBuffer()); cards++;
-      }
+      if (logo) { logos++; logoById.set(ch.id, logo); }
+      try { await render(cardSvg(ch, logo, catName[ch.category]), `${sdir}/img/${id}.jpg`); cards++; }
+      catch (e) { await render(cardSvg(ch, null, catName[ch.category]), `${sdir}/img/${id}.jpg`); cards++; } // a broken logo shouldn't cost the channel its card
       const img = `${siteUrl}s/img/${id}.jpg`;
       await writeFile(`${sdir}/${id}.html`, page({
-        url: `${siteUrl}s/${id}.html`, img, depth: 1, ch,
+        url: `${siteUrl}s/${id}.html`, img, depth: 1, ch, siteUrl,
         title: `${ch.name} — watch free on Web TV Hub`, desc: (ch.desc || 'Free live TV channel.') + ' Free, no sign-up.',
       }));
       // every show that's on now or starts before the next refresh (+ a margin), so the app's
@@ -159,11 +251,19 @@ export async function buildShare(channels, epg, categories, { outDir, siteUrl, w
       const list = epg[ch.id] || [];
       const pick = list.filter((p) => p.e > now && p.s < now + windowHours * 3600e3);
       if (pick.length) await mkdir(`${sdir}/${id}`, { recursive: true });
+      const made = new Map(); // one card per show title on this channel
       for (const p of pick) {
         const name = Math.round(p.s / 60000);
+        const key = showKey(p.t);
+        let simg = made.get(key);
+        if (!simg) {
+          try { await render(showCardSvg(ch, logo, p), `${sdir}/${id}/${key}.jpg`); simg = `${siteUrl}s/${id}/${key}.jpg`; showCards++; }
+          catch { try { await render(showCardSvg(ch, null, p), `${sdir}/${id}/${key}.jpg`); simg = `${siteUrl}s/${id}/${key}.jpg`; showCards++; } catch { simg = img; } }
+          made.set(key, simg);
+        }
         const extra = [p.ep, p.st].filter(Boolean).join(' · ');
         await writeFile(`${sdir}/${id}/${name}.html`, page({
-          url: `${siteUrl}s/${id}/${name}.html`, img, depth: 2, ch, prog: p, noindex: true,
+          url: `${siteUrl}s/${id}/${name}.html`, img: simg, depth: 2, ch, prog: p, noindex: true, siteUrl,
           title: `${p.t}${extra ? ' — ' + extra : ''} · on ${ch.name}`,
           desc: (p.d ? p.d.slice(0, 180) + (p.d.length > 180 ? '…' : '') + ' ' : '') + `Watch free on Web TV Hub.`,
         }));
@@ -172,5 +272,29 @@ export async function buildShare(channels, epg, categories, { outDir, siteUrl, w
     }
   };
   await Promise.all(Array.from({ length: 12 }, worker));
-  log(`share: ${cards} channel cards (${logos} with logos), ${shows} show pages`);
+  log(`share: ${cards} channel cards (${logos} with logos), ${shows} show pages, ${showCards} show cards`);
+
+  // site-wide cards (homepage, app page) and the files search engines read
+  const odir = `${outDir}/og`;
+  await mkdir(odir, { recursive: true });
+  const order = ['series', 'movies', 'sitcoms', 'animations', 'sports', 'news'];
+  const cats = categories.slice().sort((a, b) => (order.indexOf(a.id) + 99) % 99 - (order.indexOf(b.id) + 99) % 99).map((c) => c.name.toLowerCase().replace(/\btv\b/g, 'TV'));
+  const catLine = cats.length > 1 ? cats.slice(0, -1).join(', ') + ' & ' + cats[cats.length - 1] : cats.join('');
+  // logo strip: one channel per category first (variety), then the rest; English channels with a guide preferred
+  const ranked = channels.filter((c) => logoById.has(c.id)).sort((a, b) => ((b.lang === 'eng') - (a.lang === 'eng')) || ((b.hasEpg ? 1 : 0) - (a.hasEpg ? 1 : 0)));
+  const strip = []; const seen = new Set();
+  for (const id of order) { const c = ranked.find((x) => x.category === id); if (c) { strip.push(logoById.get(c.id)); seen.add(c.id); } }
+  for (const c of ranked) { if (strip.length >= 6) break; if (!seen.has(c.id)) strip.push(logoById.get(c.id)); }
+  const roundDown = (n) => (n >= 100 ? Math.floor(n / 50) * 50 + '+' : String(n));
+  try { await render(homeCardSvg(roundDown(channels.length), catLine.replace(/^./, (x) => x.toUpperCase()), strip), `${odir}/home.jpg`); }
+  catch (e) { await render(homeCardSvg(roundDown(channels.length), catLine, []), `${odir}/home.jpg`); log('home card without logos: ' + e.message); }
+  await render(appCardSvg(), `${odir}/app.jpg`);
+  const today = new Date().toISOString().slice(0, 10);
+  const urls = [['', 'hourly', '1.0'], ['download.html', 'weekly', '0.6'], ['privacy.html', 'monthly', '0.2'], ['terms.html', 'monthly', '0.2']]
+    .map(([u, f, pr]) => `<url><loc>${siteUrl}${u}</loc><lastmod>${today}</lastmod><changefreq>${f}</changefreq><priority>${pr}</priority></url>`)
+    .concat(channels.map((c) => `<url><loc>${siteUrl}s/${slug(c.id)}.html</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>0.5</priority></url>`));
+  await writeFile(`${outDir}/sitemap.xml`, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`);
+  await writeFile(`${outDir}/robots.txt`, `User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${siteUrl}sitemap.xml\n`);
+  if (cacheDir) { let pruned = 0; for (const f of await readdir(cacheDir)) if (!used.has(f)) { await unlink(`${cacheDir}/${f}`).catch(() => {}); pruned++; } log(`share: ${reused} cards reused from cache, ${pruned} old cards pruned`); }
+  log(`share: home + app cards, sitemap with ${urls.length} pages`);
 }

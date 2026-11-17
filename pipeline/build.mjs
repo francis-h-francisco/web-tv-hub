@@ -113,9 +113,26 @@ await writeFile(`${OUT}/stars.json`, JSON.stringify({ generated, names: stars })
 const byCat = Object.fromEntries(categories.map((c) => [c.name, outChannels.filter((x) => x.category === c.id).length]));
 const guides = {};
 for (const v of Object.values(via)) guides[v] = (guides[v] || 0) + 1;
-await writeFile(`${OUT}/report.json`, JSON.stringify({ generated, excluded: stats.excluded, health, byCategory: byCat, epgChannels: Object.keys(epg).length, guides, castTitles: Object.keys(people).length, langFix, regionKnown: outChannels.filter((c) => c.regions).length }, null, 2));
+// How much changed since the version that's live now (to judge how often refreshes are worth running)
+let changes = null;
+try {
+  const prev = await fetch(config.siteUrl + 'data/channels.json', { signal: AbortSignal.timeout(15000) }).then((r) => (r.ok ? r.json() : null));
+  if (prev && prev.channels) {
+    const before = new Map(prev.channels.map((c) => [c.id, c])), after = new Map(outChannels.map((c) => [c.id, c]));
+    const urls = (c) => JSON.stringify((c.streams || []).map((x) => x.url || x).sort());
+    changes = {
+      since: prev.generated, hours: Math.round((Date.parse(generated) - Date.parse(prev.generated)) / 360e3) / 10,
+      added: [...after.keys()].filter((k) => !before.has(k)).length,
+      removed: [...before.keys()].filter((k) => !after.has(k)).length,
+      streamChanged: [...after.keys()].filter((k) => before.has(k) && urls(before.get(k)) !== urls(after.get(k))).length,
+      total: outChannels.length,
+    };
+    log('changes since last refresh: ' + JSON.stringify(changes));
+  }
+} catch (e) { log('change check skipped: ' + e.message); }
+await writeFile(`${OUT}/report.json`, JSON.stringify({ generated, changes, excluded: stats.excluded, health, byCategory: byCat, epgChannels: Object.keys(epg).length, guides, castTitles: Object.keys(people).length, langFix, regionKnown: outChannels.filter((c) => c.regions).length }, null, 2));
 if (!flag('--skip-share')) {
-  try { await buildShare(outChannels, epg, categories, { outDir: dirname(OUT), siteUrl: config.siteUrl }, log); }
+  try { await buildShare(outChannels, epg, categories, { outDir: dirname(OUT), siteUrl: config.siteUrl, cacheRoot: new URL('../.cache', import.meta.url).pathname }, log); }
   catch (e) { log('share pages failed: ' + e.message); }
 }
 log('done', JSON.stringify(byCat));
