@@ -1188,8 +1188,10 @@
     const seen = new Set();
     const uniq = hits.filter((h) => { const k = h.c.id + (h.p ? h.p.s : ''); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 20);
     let html = '';
-    if (res[0] && res[0].s < 0.97 && fold(res[0].e.label) !== f) html += '<p class="small">Showing results for <b>' + esc(res[0].e.label) + '</b></p>';
     const w = wtwFor(q);
+    // don't "correct" a title the viewer typed exactly right just because it's on a paid service
+    const exactPaid = w.matched && wtwServices().some((x) => x.keywords.some((k) => fold(k) === f));
+    if (!exactPaid && res[0] && res[0].s < 0.97 && fold(res[0].e.label) !== f) html += '<p class="small">Showing results for <b>' + esc(res[0].e.label) + '</b></p>';
     if (w.matched || uniq.length === 0) {
       html += '<div class="wtw"><h3>Where to watch officially</h3><p class="small">' + (uniq.length ? 'Also available on paid services:' : "We couldn't find this on free TV right now. You can watch it legally here:") + '</p>' + wtwButtons(q, w.list) + '</div>';
     }
