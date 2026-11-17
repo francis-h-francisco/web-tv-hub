@@ -104,7 +104,7 @@
         '<div class="rc-row"><button class="rc-b wide" data-k="back">↩ Back</button><button class="rc-b wide" data-k="fs">⛶ Full screen</button></div>' +
         '<div class="rc-row"><div class="rc-rocker"><button class="rc-b" data-k="chup">CH ▲</button><button class="rc-b" data-k="chdown">CH ▼</button></div>' +
         '<div class="rc-rocker"><button class="rc-b" data-k="volup">VOL +</button><button class="rc-b" data-k="voldown">VOL −</button></div>' +
-        '<button class="rc-b mute" data-k="mute">🔇</button></div>' +
+        '<div class="rc-rocker" style="flex:0 0 4rem"><button class="rc-b" data-k="pause" aria-label="Pause or play">⏯</button><button class="rc-b" data-k="mute" aria-label="Mute">🔇</button></div></div>' +
         '<div class="rc-tabs" id="rcTabs"></div><div class="rc-list" id="rcList"></div>' +
         '<a class="rc-link" href="./">Watch on this phone instead</a>';
       $('#rc').addEventListener('click', (e) => {

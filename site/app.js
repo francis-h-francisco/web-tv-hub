@@ -150,7 +150,8 @@
       $('#nowMeta').textContent = 'Check your connection and reload.';
       return;
     }
-    if (!(S.profile && S.profile.country)) { const cc = await detectCountry(); if (cc) S.country = cc; }
+    const [cc] = await Promise.all([!(S.profile && S.profile.country) ? detectCountry() : null, loadSharedUnavailable()]);
+    if (cc) S.country = cc;
     await loadEpgFor(neededLangs());
     pruneExpired();
     renderTabs(); renderGuide();
@@ -171,7 +172,8 @@
     setInterval(checkReminders, 20000); checkReminders();
     setTimeout(announcePicks, 4000);
     if (!S.profile) setTimeout(openProfile, 700); else focusGuide();
-    registerSW();
+    registerSW(); initCast(); initPip();
+    if (kids()) document.body.classList.add('kids');
     if (store.get('remotePaired', false) && !isMobile()) startRemoteHost();
   }
 
@@ -212,7 +214,7 @@
 
   // ---------------------------------------------------------------- availability
   function playable(ch) { return plan(ch).length > 0; }
-  function isUnavailable(ch) { const t = S.unavail[ch.id]; return !!t && t > Date.now(); }
+  function isUnavailable(ch) { const t = S.unavail[ch.id]; return (!!t && t > Date.now()) || S.shared.has(ch.id); }
   // the language you actually hear: the channel's main audio track
   function langOk(ch) {
     if (ch.category === 'byo') return true;
@@ -227,13 +229,34 @@
     if (ch.news === 'local' && normCountry(ch.country) !== cc) return false; // local news: only your own country's
     return true;
   }
-  function isVisible(ch) { return !isUnavailable(ch) && langOk(ch) && regionOk(ch); }
+  function isVisible(ch) { return !isUnavailable(ch) && langOk(ch) && regionOk(ch) && kidsOk(ch); }
   function visible() { return S.all.filter(isVisible); }
   function pruneExpired() {
     const now = Date.now(); let changed = false;
     for (const k in S.unavail) if (S.unavail[k] < now) { delete S.unavail[k]; changed = true; }
     for (const k in S.probes) if (S.probes[k].at + PROBE_TTL < now) { delete S.probes[k]; changed = true; }
     if (changed) { store.set('unavail', S.unavail); store.set('probes', S.probes); }
+  }
+
+  // ---------------------------------------------------------------- shared reports (anonymous)
+  // Each device reports "played / didn't play" per channel (country comes from the network, nothing else
+  // is sent). Channels several viewers in a country couldn't play are hidden for everyone there.
+  const API = /\.pages\.dev$/.test(location.hostname) ? '/api' : 'https://webtv.pages.dev/api';
+  S.shared = new Set();
+  async function loadSharedUnavailable() {
+    try {
+      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 3500);
+      const j = await fetch(API + '/unavailable', { signal: ctrl.signal }).then((r) => r.json()); clearTimeout(t);
+      (j.ids || []).forEach((id) => S.shared.add(id));
+    } catch (e) { /* API not set up yet or offline: fine */ }
+  }
+  function report(ch, ok) {
+    if (!ch || ch.category === 'byo') return;
+    const day = Math.floor(Date.now() / 86400000), seen = store.get('reported', {});
+    if (seen[ch.id] === day + ':' + ok) return;
+    seen[ch.id] = day + ':' + ok; for (const k in seen) if (+String(seen[k]).split(':')[0] < day - 1) delete seen[k];
+    store.set('reported', seen);
+    try { fetch(API + '/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ch: ch.id, ok }), keepalive: true }).catch(() => {}); } catch (e) { /* ignore */ }
   }
 
   /** Remove a channel from every list the moment we know it can't play here. */
@@ -270,6 +293,7 @@
         const ok = await probe(next);
         S.probes[next.id] = { ok, at: Date.now() }; store.set('probes', S.probes);
         if (!ok) markUnavailable(next, 'probe');
+        report(next, ok);
         await sleep(400);
       }
     };
@@ -409,10 +433,81 @@
     return visible().map((c) => [scoreFor(c, pc), c]).filter((x) => x[0] > 0.5).sort((a, b) => b[0] - a[0]).slice(0, 40).map((x) => x[1]);
   }
 
+  // ---------------------------------------------------------------- continue watching
+  function addHistory(ch) {
+    if (!ch || ch.category === 'byo') return;
+    const h = store.get('history', []).filter((x) => x.id !== ch.id);
+    h.unshift({ id: ch.id, at: Date.now() }); store.set('history', h.slice(0, 15));
+  }
+  function recent() { return store.get('history', []).map((x) => S.byId.get(x.id)).filter((c) => c && isVisible(c) && c !== S.current).slice(0, 12); }
+
+  // ---------------------------------------------------------------- kids mode
+  // Only kids & family animation channels; leaving needs the parent's PIN. (A soft lock: it lives in this browser.)
+  const kids = () => !!(store.get('kids', null) || {}).on;
+  function kidsOk(ch) { return !kids() || (ch.category === 'animations' && (ch.labels || []).some((l) => l === 'Kids' || l === 'Family')); }
+  async function pinHash(pin) { const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('wth-kids:' + pin)); return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, '0')).join(''); }
+  function openKids() {
+    const k = store.get('kids', null);
+    if (k && k.on) {
+      openOverlay('<h2>Leave kids mode</h2><p>Enter the parent PIN.</p><input class="field" id="pin" data-focus data-autofocus inputmode="numeric" maxlength="6" type="password" autocomplete="off"><p class="small" id="pinMsg"></p>' +
+        '<div class="panel-actions"><button class="btn" data-focus data-close>Cancel</button><button class="btn primary" data-focus id="pinGo">Unlock</button></div>');
+      const go = async () => { if ((await pinHash($('#pin').value)) === k.pin) { store.set('kids', { on: false }); closeOverlay(); applyKids(); toast('Kids mode is off.', null, 2500); } else { $('#pinMsg').textContent = 'That PIN is not right.'; } };
+      $('#pinGo').onclick = go; $('#pin').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+      return;
+    }
+    openOverlay('<h2>Kids mode</h2><p>Shows only kids and family animation channels and hides everything else, including search and settings. Choose a 4-digit parent PIN; you\'ll need it to leave kids mode.</p>' +
+      '<input class="field" id="pin" data-focus data-autofocus inputmode="numeric" maxlength="6" type="password" placeholder="PIN (4–6 digits)" autocomplete="off"><p class="small" id="pinMsg"></p>' +
+      '<div class="panel-actions"><button class="btn" data-focus data-close>Cancel</button><button class="btn primary" data-focus id="pinGo">Turn on kids mode</button></div>');
+    const go = async () => {
+      const v = $('#pin').value.trim(); if (!/^\d{4,6}$/.test(v)) { $('#pinMsg').textContent = 'Use 4 to 6 digits.'; return; }
+      store.set('kids', { on: true, pin: await pinHash(v) }); closeOverlay(); applyKids(); toast('🧒 Kids mode is on.', null, 3000);
+    };
+    $('#pinGo').onclick = go; $('#pin').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+  }
+  function applyKids() {
+    document.body.classList.toggle('kids', kids());
+    S.tab = null; renderTabs(); renderGuide();
+    if (S.current && !kidsOk(S.current)) { const c = tabList()[0]; if (c) play(c, { list: tabList() }); else { stopPlayback(); setMsg('No kids channels are available here right now.'); } }
+  }
+
+  // ---------------------------------------------------------------- sleep timer
+  const SLEEP_STEPS = [0, 15, 30, 60, 90];
+  S.sleepAt = 0;
+  function cycleSleep() {
+    const cur = S.sleepAt ? Math.round((S.sleepAt - Date.now()) / 60000) : 0;
+    const next = SLEEP_STEPS.find((m) => m > cur + 1) || 0;
+    S.sleepAt = next ? Date.now() + next * 60000 : 0;
+    clearTimeout(S.sleepT);
+    if (next) S.sleepT = setTimeout(sleepNow, next * 60000);
+    const b = $('#sleepBtn'); b.classList.toggle('on', !!next); b.innerHTML = next ? '🌙<span class="badge">' + next + '</span>' : '🌙';
+    toast(next ? '🌙 Sleep timer: TV turns off in ' + next + ' min.' : 'Sleep timer off.', null, 2500, 'sleep');
+  }
+  function sleepNow() {
+    S.sleepAt = 0; const b = $('#sleepBtn'); b.classList.remove('on'); b.textContent = '🌙';
+    if (!S.paused) togglePause();
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+    setMsg('🌙 Sleep timer ended. Press play to keep watching.');
+  }
+
+  // ---------------------------------------------------------------- picture-in-picture
+  function initPip() {
+    const ok = document.pictureInPictureEnabled || (video.webkitSupportsPresentationMode && typeof video.webkitSetPresentationMode === 'function');
+    const b = $('#pipBtn'); if (b) b.hidden = !ok;
+  }
+  async function togglePip() {
+    try {
+      if (document.pictureInPictureElement) await document.exitPictureInPicture();
+      else if (video.requestPictureInPicture) await video.requestPictureInPicture();
+      else if (video.webkitSetPresentationMode) video.webkitSetPresentationMode(video.webkitPresentationMode === 'picture-in-picture' ? 'inline' : 'picture-in-picture');
+    } catch (e) { toast("Picture-in-picture isn't available for this channel.", null, 3000, 'pip'); }
+  }
+
   // ---------------------------------------------------------------- tabs + guide
   function tabs() {
     const v = visible(); const t = [];
+    if (kids()) { t.push({ id: 'kids', name: '🧒 Kids', list: v }); return t; }
     const fy = forYou(); if (fy.length) t.push({ id: 'foryou', name: 'For you', list: fy });
+    const rc = recent(); if (rc.length) t.push({ id: 'recent', name: '⟲ Continue watching', list: rc });
     const favs = v.filter((c) => S.favs.has(c.id)); if (favs.length) t.push({ id: 'favs', name: '★ Favorites', list: favs });
     const order = ['series', 'movies', 'sitcoms', 'animations', 'sports', 'news'];
     const cats = S.categories.slice().sort((a, b) => (order.indexOf(a.id) + 99) % 99 - (order.indexOf(b.id) + 99) % 99);
@@ -514,13 +609,14 @@
   }
   function play(ch, opts) {
     opts = opts || {};
-    S.current = ch; S.userPick = !!opts.user;
+    S.current = ch; S.userPick = !!opts.user; S.paused = false; updateControls();
     if (opts.list && opts.list.length) S.list = opts.list;
     if (!S.list.includes(ch)) S.list = tabList().includes(ch) ? tabList() : visible().filter((c) => c.category === ch.category);
     if (!S.list.includes(ch)) S.list = [ch].concat(S.list);
     if (ch.category !== 'byo') store.set('last', ch.id);
     S.attempts = plan(ch, true); S.attempt = 0;
     renderNow(); renderTimeline(); refreshGuideTimes(); osd(); notifyChange();
+    if (castState.session) { stopPlayback(); castCurrent(); return; }
     if (!S.attempts.length) { failChannel("This channel can't play in this browser."); return; }
     tryAttempt();
   }
@@ -549,12 +645,12 @@
   video.addEventListener('playing', () => {
     clearTimeout(S.startTimer); setMsg(''); $('#unmute').hidden = !video.muted || S.interacted;
     Array.from(video.textTracks || []).forEach((t) => { t.mode = 'disabled'; }); // captions off: most channels don't provide reliable ones
-    if (S.current) { S.probes[S.current.id] = { ok: true, at: Date.now() }; store.set('probes', S.probes); }
+    if (S.current) { S.probes[S.current.id] = { ok: true, at: Date.now() }; store.set('probes', S.probes); report(S.current, true); addHistory(S.current); }
     setTimeout(startProber, 5000);
   });
   if (video.textTracks && video.textTracks.addEventListener) video.textTracks.addEventListener('addtrack', (e) => { if (e.track) e.track.mode = 'disabled'; });
   video.addEventListener('error', () => { if (!S.hls && video.getAttribute('src')) nextAttempt(); });
-  video.addEventListener('waiting', () => { clearTimeout(S.stallTimer); S.stallTimer = setTimeout(() => { if (!video.paused && video.readyState < 3) { setMsg('Reconnecting…'); nextAttempt(); } }, 20000); });
+  video.addEventListener('waiting', () => { clearTimeout(S.stallTimer); S.stallTimer = setTimeout(() => { if (!S.paused && !video.paused && video.readyState < 3) { setMsg('Reconnecting…'); nextAttempt(); } }, 20000); });
   video.addEventListener('timeupdate', () => clearTimeout(S.stallTimer));
 
   /** A channel failed on this device: remove it everywhere, never leave it in the list. */
@@ -562,7 +658,7 @@
     const ch = S.current; stopPlayback();
     const i = S.list.indexOf(ch);
     const next = S.list.slice(i + 1).concat(S.list.slice(0, Math.max(0, i))).find((c) => c !== ch && isVisible(c) && playable(c));
-    markUnavailable(ch, 'play');
+    markUnavailable(ch, 'play'); if (S.attempts.length) report(ch, false);
     if (!S.userPick && next) {
       // lean-back start: quietly move on, the broken channel is already gone from the guide
       toast(esc(ch.name) + " isn't available right now, so we removed it. Now playing <b>" + esc(next.name) + '</b>.', null, 5000, 'skip');
@@ -579,13 +675,57 @@
     if (c) play(c, { list: S.list, user: true });
   }
   function setMsg(t) { $('#playerMsg').textContent = t || ''; }
+
+  // ---------------------------------------------------------------- pause / mute
+  // Pausing live TV stops downloading (saves data); resuming jumps back to live, like a TV.
+  S.paused = false;
+  function togglePause() {
+    if (!S.current) return;
+    if (!S.paused) {
+      S.paused = true; video.pause(); if (S.hls) try { S.hls.stopLoad(); } catch (e) { /* ignore */ }
+      toast('⏸ Paused. Press play to go back to live.', null, 2500, 'pause');
+    } else {
+      S.paused = false;
+      if (S.hls) { try { S.hls.startLoad(-1); } catch (e) { /* ignore */ } }
+      const jump = () => {
+        try {
+          if (S.hls && S.hls.liveSyncPosition) video.currentTime = S.hls.liveSyncPosition;
+          else if (video.seekable && video.seekable.length) video.currentTime = Math.max(0, video.seekable.end(video.seekable.length - 1) - 3);
+        } catch (e) { /* ignore */ }
+        const p = video.play(); if (p && p.catch) p.catch(() => {});
+      };
+      jump(); toast('▶ Back to live', null, 1500, 'pause');
+    }
+    updateControls();
+  }
+  function toggleMute() {
+    if (video.muted) { unmuteFromUser(); } else { video.muted = true; }
+    updateControls();
+  }
+  function unmuteFromUser() {
+    S.interacted = true; video.muted = false; $('#unmute').hidden = true;
+    const p = video.play(); if (p && p.catch) p.catch(() => {});
+  }
+  function updateControls() {
+    const pb = $('#pauseBtn'), mb = $('#muteBtn');
+    if (pb) { pb.textContent = S.paused ? '▶' : '⏸'; pb.setAttribute('aria-label', S.paused ? 'Play (back to live)' : 'Pause'); pb.classList.toggle('on', S.paused); }
+    if (mb) { mb.textContent = video.muted ? '🔇' : '🔊'; mb.setAttribute('aria-label', video.muted ? 'Unmute' : 'Mute'); mb.classList.toggle('on', video.muted); }
+  }
+  video.addEventListener('volumechange', updateControls);
+
   function unmuteOnce() {
-    if (S.interacted || remoteMode()) return; S.interacted = true;
+    if (S.interacted || remoteMode()) return; S.interacted = true; S.unmutedAt = Date.now();
     video.muted = false; $('#unmute').hidden = true;
     const p = video.play(); if (p && p.catch) p.catch(() => {});
   }
   $('#unmute').addEventListener('click', (e) => { e.stopPropagation(); unmuteOnce(); });
-  $('#player').addEventListener('click', () => { if (!S.interacted) unmuteOnce(); else if (document.body.classList.contains('fs')) exitFs(); else enterFs(); });
+  // tap / click: unmute the first time, otherwise show the controls; double-tap / double-click: full screen
+  $('#player').addEventListener('click', (e) => {
+    if (e.target.closest('#pctl')) return; // the control buttons handle themselves
+    if (!S.interacted || Date.now() - (S.unmutedAt || 0) < 600) { unmuteOnce(); return; }
+    const c = $('#pctl'); c.classList.add('show'); clearTimeout(S.pctlT); S.pctlT = setTimeout(() => c.classList.remove('show'), 3500);
+  });
+  $('#player').addEventListener('dblclick', (e) => { if (e.target.closest('#pctl')) return; if (document.body.classList.contains('fs')) exitFs(); else enterFs(); });
 
   function renderNow() {
     const ch = S.current; if (!ch) return;
@@ -758,6 +898,7 @@
       '<details class="more-prefs"' + ((P.interests || []).length || (P.eras || []).length ? ' open' : '') + '><summary data-focus tabindex="0">More preferences (optional)</summary>' +
       '<h3>Topics</h3><div class="chips">' + Object.keys(INTERESTS).map((k) => chip('int', k, k, (P.interests || []).includes(k))).join('') + '</div>' +
       '<h3>Era</h3><div class="chips">' + chip('era', 'classic', 'Classics (before 1990)', (P.eras || []).includes('classic')) + chip('era', 'y2k', '90s & 2000s', (P.eras || []).includes('y2k')) + chip('era', 'modern', 'Newer shows', (P.eras || []).includes('modern')) + '</div></details>' +
+      '<h3>For families</h3><button class="btn small" data-focus data-action="kids">🧒 Turn on kids mode (with a parent PIN)</button>' +
       '<div class="panel-actions">' + (S.profile ? '<button class="btn" data-focus data-close>Cancel</button>' : '<button class="btn" data-focus data-ob="skip">Skip</button>') + '<button class="btn primary" data-focus data-ob="save" data-autofocus>' + (S.profile && !S.profile.skipped ? 'Save' : 'Start watching') + '</button></div>',
       () => { if (!S.profile) { S.profile = { skipped: true, cats: {}, langs: ['eng'] }; store.set('profile', S.profile); } });
     $$('#panel .chip[data-group]').forEach((b) => b.addEventListener('click', () => b.classList.toggle('on')));
@@ -951,6 +1092,7 @@
       '<div class="chips">' + (S.byo ? '<button class="btn small" data-focus data-m3u="remove">Remove playlist</button>' : '') + '<button class="btn small" data-focus data-m3u="save">Load playlist</button></div>' +
       '<h3>About</h3><p>A free guide to live channels that broadcasters already stream for free. We check every channel every 6 hours, and your device double-checks the ones you can see, so channels that don\'t work for you are removed automatically.</p>' +
       '<p>We don\'t host or re-stream any video. Channel data comes from the open <a href="https://github.com/iptv-org/iptv" target="_blank" rel="noopener">iptv-org</a> project; schedules and channel descriptions from public listings of free ad-supported services; cast information from <a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>.</p>' +
+      '<p>To keep the guide honest, your device anonymously reports whether channels play (just the channel and works / doesn\'t work; your country comes from your network). Channels several viewers in a country can\'t play are hidden for everyone there. Nothing else is collected.</p>' +
       '<p>Rights-holder and want a channel removed? <a href="https://github.com/francis-h-francisco/web-tv-hub/issues/new?title=Removal%20request" target="_blank" rel="noopener">Open a removal request</a>.</p>' +
       '<p class="small">Channel list checked ' + esc(relTime(S.generated)) + '.' + (S.hiddenForBrowser ? ' ' + S.hiddenForBrowser + ' more free channels play on Android TV sticks, phones and Safari but not in this browser.' : '') + '</p>' +
       '<div class="panel-actions"><button class="btn" data-focus data-close data-autofocus>Close</button></div>');
@@ -1007,6 +1149,7 @@
     const tab = e.target.closest('[data-tab]'); if (tab) { setTab(tab.dataset.tab, !isMobile()); return; }
     const b = e.target.closest('[data-action]'); if (!b) return;
     const a = b.dataset.action;
+    if (kids() && ['search', 'profile', 'more', 'langs', 'location', 'mytv', 'sharech'].includes(a)) { openKids(); return; }
     if (a === 'search') openSearch();
     else if (a === 'mytv') openMyTv();
     else if (a === 'profile') openProfile();
@@ -1017,6 +1160,12 @@
     else if (a === 'home') { closeOverlay(); setBottom('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
     else if (a === 'fullscreen') enterFs();
     else if (a === 'sharech' && S.current) share(S.current, null);
+    else if (a === 'pause') togglePause();
+    else if (a === 'cast') castClick();
+    else if (a === 'sleep') cycleSleep();
+    else if (a === 'pip') togglePip();
+    else if (a === 'kids') openKids();
+    else if (a === 'mute') toggleMute();
     else if (a === 'fav' && S.current) {
       const id = S.current.id;
       if (S.favs.has(id)) S.favs.delete(id); else { S.favs.add(id); toast('Added <b>' + esc(S.current.name) + '</b> to Favorites.', null, 3000); }
@@ -1099,6 +1248,8 @@
     }
     if (k === 'ChannelUp' || k === 'PageUp') { e.preventDefault(); zap(-1); return; }
     if (k === 'ChannelDown' || k === 'PageDown') { e.preventDefault(); zap(1); return; }
+    if (!inField && (k === ' ' && !(e.target.closest && e.target.closest('button')) || k === 'k' || k === 'MediaPlayPause' || k === 'MediaPause' || k === 'MediaPlay')) { e.preventDefault(); togglePause(); return; }
+    if (!inField && (k === 'm' || k === 'AudioVolumeMute')) { e.preventDefault(); toggleMute(); return; }
     const dir = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }[k];
     if (dir) {
       if (inField && (dir === 'left' || dir === 'right')) return;
@@ -1106,6 +1257,53 @@
     }
   });
   document.addEventListener('pointerdown', () => { if (!S.interacted) unmuteOnce(); }, { once: true });
+  // remote/keyboard users get a visible focus ring; touch and mouse users don't
+  document.addEventListener('keydown', (e) => { if (/^Arrow|^Enter$|^Tab$/.test(e.key) && !document.body.classList.contains('kbd')) document.body.classList.add('kbd'); }, true);
+  document.addEventListener('pointerdown', () => document.body.classList.remove('kbd'), true);
+
+  // ---------------------------------------------------------------- Chromecast
+  // Uses Google's default Cast receiver, which loads the stream itself, so only streams that allow
+  // other sites to read them (CORS) can be cast. The button only appears where casting is available.
+  const castState = { ctx: null, session: null };
+  function initCast() {
+    if (!/Chrome|CriOS/.test(UA) || /Edg|OPR/.test(UA) || window.Capacitor) return;
+    window.__onGCastApiAvailable = (ok) => {
+      if (!ok || !window.cast || !cast.framework) return;
+      const ctx = cast.framework.CastContext.getInstance();
+      ctx.setOptions({ receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID, autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED });
+      castState.ctx = ctx;
+      const btn = $('#castBtn'); if (btn) btn.hidden = false;
+      ctx.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, (ev) => {
+        const st = ev.sessionState, SS = cast.framework.SessionState;
+        if (st === SS.SESSION_STARTED || st === SS.SESSION_RESUMED) { castState.session = ctx.getCurrentSession(); castCurrent(); }
+        if (st === SS.SESSION_ENDED) { castState.session = null; $('#castBtn').classList.remove('on'); setMsg(''); const p = video.play(); if (p && p.catch) p.catch(() => {}); }
+      });
+    };
+    const s = document.createElement('script'); s.src = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1'; s.async = true; document.head.appendChild(s);
+  }
+  function castable(ch) { return ch && (ch.streams || []).find((s) => s.cors === true); }
+  async function castClick() {
+    if (!castState.ctx) return;
+    if (!castable(S.current)) { toast("This channel can't be sent to a Chromecast. Most other channels can.", null, 4000, 'cast'); return; }
+    if (castState.session) { castCurrent(); return; }
+    try { await castState.ctx.requestSession(); } catch (e) { /* user closed the device picker */ }
+  }
+  function castCurrent() {
+    const sess = castState.session, ch = S.current; if (!sess || !ch) return;
+    const s = castable(ch);
+    if (!s) { toast(esc(ch.name) + " can't be cast. Pick another channel to send it to your TV.", null, 4000, 'cast'); return; }
+    const info = new chrome.cast.media.MediaInfo(s.url, 'application/x-mpegURL');
+    info.streamType = chrome.cast.media.StreamType.LIVE;
+    const md = new chrome.cast.media.GenericMediaMetadata();
+    const np = nowProg(ch); md.title = np ? np.t : ch.name; md.subtitle = ch.name;
+    if (ch.logo) md.images = [new chrome.cast.Image(ch.logo)];
+    info.metadata = md;
+    const req = new chrome.cast.media.LoadRequest(info); req.autoplay = true;
+    sess.loadMedia(req).then(() => {
+      video.pause(); $('#castBtn').classList.add('on');
+      setMsg('📡 Playing on ' + sess.getCastDevice().friendlyName + '. Change channels here and the TV follows.');
+    }, () => toast("Your TV couldn't play " + esc(ch.name) + '. Try another channel.', null, 4000, 'cast'));
+  }
 
   // ---------------------------------------------------------------- share (rich-preview links)
   const SITE = location.origin + location.pathname.replace(/[^/]*$/, '');
@@ -1170,6 +1368,7 @@
     if (k === 'fs') { if (fs) exitFs(); else enterFs(); return; }
     if (k === 'volup' || k === 'voldown') { video.volume = Math.max(0, Math.min(1, video.volume + (k === 'volup' ? 0.1 : -0.1))); unmuteFromRemote(); toast('🔊 ' + Math.round(video.volume * 100) + '%', null, 1200, 'vol'); return; }
     if (k === 'mute') { if (video.muted) unmuteFromRemote(); else { video.muted = true; toast('🔇 Muted', null, 1200, 'vol'); } }
+    if (k === 'pause') togglePause();
   }
   function unmuteFromRemote() {
     if (!video.muted) return;

@@ -30,6 +30,8 @@ GitHub Actions (every 6 h)                         Browser (TV stick, phone, lap
 - **Location-aware:** channels not offered in the viewer's country are hidden, based on platform country lists, region-lock labels and local news. See playbook 8c.
 - **Phone remote:** Remote on the TV shows a QR code and code; the phone becomes a remote over a direct WebRTC link (`site/remote.js`, PeerJS).
 - **Sharing:** every channel, and every show on now or starting within about 9 hours, has a page with a 1200×630 preview card (`site/s/`, built by `pipeline/share.mjs` with resvg and sharp). Show links "expire": after the show ends the page says so and points to what's on now, and after the next refresh it's removed (`404.html` sends visitors to the channel).
+- **Cloudflare Pages:** each refresh also publishes the built site, `cloudflare/functions` (API) and `cloudflare/wrangler.toml` to the `cf-pages` branch. A Pages project connected to that branch deploys it (planned address: webtv.pages.dev). The API stores anonymous "plays / doesn't play" reports per country in D1 (`webtv-db`) and serves `/api/unavailable`, so channels that fail for viewers in a country get hidden for everyone there.
+- **Viewer features:** pause (back to live) and mute, Chromecast (streams that allow casting), picture-in-picture, sleep timer, continue watching, kids mode with a parent PIN.
 - **`app/`**: Android app (Capacitor shell with native reminders). Built, ClamAV-scanned and released by `.github/workflows/android.yml`; download page `site/download.html`.
 - **`config/curation.json`**: everything a curator changes, including stream hosts, news channels, categories, languages, guide sources and "where to watch" links.
 

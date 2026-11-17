@@ -22,6 +22,12 @@
   ol { padding-left: 1.2rem; } li { margin: .3rem 0; }
   .muted { color: var(--dim); font-size: .9rem; }
   a.back { color: var(--dim); text-decoration: none; }
+  .why { display: grid; gap: .7rem; margin-bottom: 1rem; }
+  .feat { display: flex; gap: .9rem; align-items: flex-start; background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius); padding: .9rem 1rem; }
+  .feat > span { font-size: 1.6rem; line-height: 1; margin-top: .15rem; }
+  .feat b { display: block; margin-bottom: .2rem; }
+  .feat p { margin: 0; color: var(--dim); font-size: .92rem; line-height: 1.45; }
+  @media (min-width: 700px) { .why { grid-template-columns: 1fr 1fr 1fr; } }
 </style>
 </head>
 <body>
@@ -29,6 +35,12 @@
   <a class="back" href="./">← Back to Web TV Hub</a>
   <h1>Web TV Hub for Android</h1>
   <p class="lead">The same free TV, plus show reminders that pop up even when the app is closed, and it doubles as a remote for Web TV Hub on your TV.</p>
+
+  <div class="why">
+    <div class="feat"><span>🔔</span><div><b>Never miss a show</b><p>Set a reminder and your phone alerts you an hour before, 15 minutes before and when it starts, even if the app is closed. The website can only remind you while it's open.</p></div></div>
+    <div class="feat"><span>📺</span><div><b>Your phone becomes the TV remote</b><p>Open Web TV Hub on your TV's browser, scan its code, and change channels, volume or pause from your phone. No account needed.</p></div></div>
+    <div class="feat"><span>⚡</span><div><b>Opens like an app</b><p>One tap from your home screen, full screen, no browser bars. It's small (about 4 MB) and always up to date, because the TV guide updates itself.</p></div></div>
+  </div>
 
   <div class="card" id="release"><p class="muted">Checking the latest build…</p></div>
 

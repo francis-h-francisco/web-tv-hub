@@ -15,7 +15,7 @@
 </head>
 <body>
 <header class="topbar">
-  <div class="brand"><span class="brand-dot"></span><span>Web TV Hub</span></div>
+  <div class="brand"><span class="brand-dot"></span><span>Web TV Hub</span><button class="kidsbadge" data-action="kids">🧒 Kids mode</button></div>
   <nav class="topnav" aria-label="Main">
     <button class="navbtn" data-focus data-action="search">Search</button>
     <button class="navbtn" data-focus data-action="mytv">My TV</button>
@@ -33,6 +33,13 @@
       <video id="video" playsinline muted autoplay></video>
       <div class="player-msg" id="playerMsg"></div>
       <button class="unmute" id="unmute" hidden>🔇 Tap or press OK for sound</button>
+      <div class="pctl" id="pctl">
+        <button class="pbtn" data-focus data-action="pause" id="pauseBtn" aria-label="Pause">⏸</button>
+        <button class="pbtn" data-focus data-action="mute" id="muteBtn" aria-label="Mute">🔊</button>
+        <button class="pbtn" data-focus data-action="cast" id="castBtn" aria-label="Cast to TV" hidden>📡</button>
+        <button class="pbtn" data-focus data-action="pip" id="pipBtn" aria-label="Picture in picture" hidden>⧉</button>
+        <button class="pbtn" data-focus data-action="sleep" id="sleepBtn" aria-label="Sleep timer">🌙</button>
+      </div>
     </div>
     <div class="nowcard">
       <div class="ch-line">
