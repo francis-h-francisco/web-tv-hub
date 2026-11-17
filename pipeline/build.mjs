@@ -8,6 +8,7 @@ import { makeChecker } from './health.mjs';
 import { buildEpg } from './epg.mjs';
 import { buildPeople, buildDirectory } from './people.mjs';
 import { buildShare } from './share.mjs';
+import { resolveAffiliates } from './affiliates.mjs';
 import { dirname } from 'node:path';
 
 const args = process.argv.slice(2);
@@ -108,7 +109,10 @@ const epgByLang = {};
 for (const c of outChannels) if (epg[c.id]) (epgByLang[c.lang] ||= {})[c.id] = epg[c.id];
 for (const [lang, part] of Object.entries(epgByLang)) await writeFile(`${OUT}/epg/${lang}.json`, JSON.stringify({ generated, epg: part }));
 await writeFile(`${OUT}/people.json`, JSON.stringify({ generated, cast: people }));
-await writeFile(`${OUT}/where-to-watch.json`, JSON.stringify(config.whereToWatch));
+// 'Where to watch' links with the owner's affiliate IDs (config/affiliates.json); a broken file stops the build
+const affiliates = resolveAffiliates(JSON.parse(await readFile(new URL('../config/affiliates.json', import.meta.url), 'utf8')));
+await writeFile(`${OUT}/where-to-watch.json`, JSON.stringify(affiliates));
+log(`affiliates: ${affiliates.services.length} services, ${affiliates.services.filter((x) => x.aff).length} with your affiliate ID`);
 await writeFile(`${OUT}/stars.json`, JSON.stringify({ generated, names: stars }));
 const byCat = Object.fromEntries(categories.map((c) => [c.name, outChannels.filter((x) => x.category === c.id).length]));
 const guides = {};

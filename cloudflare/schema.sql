@@ -7,3 +7,6 @@ CREATE TABLE IF NOT EXISTS email_reminders (id TEXT PRIMARY KEY, sub_id TEXT NOT
 CREATE INDEX IF NOT EXISTS rem_due ON email_reminders (sent_at, start);
 CREATE TABLE IF NOT EXISTS rate (k TEXT PRIMARY KEY, n INTEGER NOT NULL, day INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS config (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+
+-- "Where to watch" link clicks (affiliate reporting): counts only
+CREATE TABLE IF NOT EXISTS clicks (day INTEGER NOT NULL, svc TEXT NOT NULL, country TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, svc, country));

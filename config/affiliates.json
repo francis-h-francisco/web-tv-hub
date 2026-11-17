@@ -1,0 +1,87 @@
+{
+  "_howTo": [
+    "This file controls the 'Where to watch' links shown when something isn't on free TV.",
+    "1) Paste your affiliate IDs into myIds below. Leave a value empty until you have it: those links simply stay normal (non-affiliate) links.",
+    "2) Each service's 'affiliate' rule uses {{idName}} from myIds. Two kinds of rule:",
+    "   'add': query parameters added to the link, e.g. Amazon's tag=YOURTAG-20.",
+    "   'wrap': a tracking-link template from an affiliate network (Impact, CJ, Rakuten, Awin...). Put {url} where the destination address goes; it is filled in and encoded for you.",
+    "3) In 'url', {q} is replaced with what the viewer searched for. A url without {q} just opens the service.",
+    "4) countries: two-letter codes where the service is offered, or [\"*\"] for everywhere. enabled: false hides a service without deleting it.",
+    "5) keywords: titles, brands or teams this service is known for. A search matching one shows that service first.",
+    "6) suggest: true means the service is also offered as a 'Search on ...' option when nothing matches.",
+    "Save (commit) on GitHub and the site updates within about 10 minutes. A broken edit is caught by the checks and the live site keeps the last good version."
+  ],
+  "disclosure": "Some of these are affiliate links: Web TV Hub may earn a small commission if you sign up or buy, at no extra cost to you.",
+  "myIds": {
+    "amazonTag": "",
+    "appleToken": "",
+    "disneyPlusTrackingLink": "",
+    "maxTrackingLink": "",
+    "paramountPlusTrackingLink": "",
+    "peacockTrackingLink": "",
+    "huluTrackingLink": "",
+    "nbaTrackingLink": ""
+  },
+  "services": [
+    {
+      "id": "netflix", "name": "Netflix", "enabled": true, "countries": ["*"], "suggest": true,
+      "url": "https://www.netflix.com/search?q={q}",
+      "affiliate": null,
+      "keywords": ["netflix", "stranger things", "wednesday", "squid game", "the crown", "bridgerton", "money heist", "ozark", "the witcher"]
+    },
+    {
+      "id": "prime", "name": "Prime Video (rent or buy)", "enabled": true, "countries": ["*"], "suggest": true,
+      "url": "https://www.amazon.com/s?k={q}&i=instant-video",
+      "affiliate": { "add": { "tag": "{{amazonTag}}" } },
+      "keywords": ["prime video", "amazon", "the boys", "reacher", "rings of power", "invincible", "fallout", "jack ryan", "titanic", "gladiator"]
+    },
+    {
+      "id": "apple", "name": "Apple TV", "enabled": true, "countries": ["*"], "suggest": true,
+      "url": "https://tv.apple.com/search?term={q}",
+      "affiliate": { "add": { "at": "{{appleToken}}", "ct": "webtvhub" } },
+      "keywords": ["apple tv", "ted lasso", "severance", "slow horses", "silo", "shrinking", "the morning show"]
+    },
+    {
+      "id": "disney", "name": "Disney+", "enabled": true, "countries": ["*"], "suggest": false,
+      "url": "https://www.disneyplus.com/",
+      "affiliate": { "wrap": "{{disneyPlusTrackingLink}}" },
+      "keywords": ["disney", "marvel", "pixar", "star wars", "bluey", "the mandalorian", "loki", "the simpsons", "frozen"]
+    },
+    {
+      "id": "max", "name": "HBO Max", "enabled": true, "countries": ["*"], "suggest": false,
+      "url": "https://www.hbomax.com/",
+      "affiliate": { "wrap": "{{maxTrackingLink}}" },
+      "keywords": ["hbo", "max", "game of thrones", "house of the dragon", "the last of us", "succession", "friends", "the white lotus", "cartoon network"]
+    },
+    {
+      "id": "paramount", "name": "Paramount+", "enabled": true, "countries": ["*"], "suggest": false,
+      "url": "https://www.paramountplus.com/",
+      "affiliate": { "wrap": "{{paramountPlusTrackingLink}}" },
+      "keywords": ["paramount", "yellowstone", "star trek", "young sheldon", "big bang theory", "south park", "spongebob", "1923", "tulsa king"]
+    },
+    {
+      "id": "peacock", "name": "Peacock", "enabled": true, "countries": ["US"], "suggest": false,
+      "url": "https://www.peacocktv.com/",
+      "affiliate": { "wrap": "{{peacockTrackingLink}}" },
+      "keywords": ["peacock", "the office", "parks and recreation", "yellowjackets", "wwe", "premier league"]
+    },
+    {
+      "id": "hulu", "name": "Hulu", "enabled": true, "countries": ["US"], "suggest": false,
+      "url": "https://www.hulu.com/",
+      "affiliate": { "wrap": "{{huluTrackingLink}}" },
+      "keywords": ["hulu", "the bear", "only murders in the building", "family guy", "abbott elementary", "malcolm in the middle"]
+    },
+    {
+      "id": "nba", "name": "NBA League Pass", "enabled": true, "countries": ["*"], "suggest": false,
+      "url": "https://www.nba.com/watch/league-pass-stream",
+      "affiliate": { "wrap": "{{nbaTrackingLink}}" },
+      "keywords": ["nba", "basketball", "lakers", "warriors", "celtics", "league pass"]
+    },
+    {
+      "id": "youtube", "name": "YouTube", "enabled": true, "countries": ["*"], "suggest": false,
+      "url": "https://www.youtube.com/results?search_query={q}",
+      "affiliate": null,
+      "keywords": ["youtube", "trailer", "music video"]
+    }
+  ]
+}

@@ -125,3 +125,30 @@ test('share pages carry previews and valid structured data', async () => {
   assert.match(show, /og:image" content="https:\/\/x\.test\/s\/Test\.us\/show-tell\.jpg"/);
   assert.match(await rf(`${dir}/sitemap.xml`, 'utf8'), /<loc>https:\/\/x\.test\/s\/Test\.us\.html<\/loc>/);
 });
+
+test('affiliate links: IDs applied only when set, bad config rejected', async () => {
+  const { resolveAffiliates, validateAffiliates } = await import('./affiliates.mjs');
+  const base = (ids) => ({ myIds: ids, services: [
+    { id: 'prime', name: 'Prime', countries: ['*'], keywords: [], url: 'https://www.amazon.com/s?k={q}&i=instant-video', affiliate: { add: { tag: '{{amazonTag}}' } } },
+    { id: 'dis', name: 'Disney+', countries: ['US'], keywords: [], url: 'https://www.disneyplus.com/', affiliate: { wrap: '{{dis}}' } },
+    { id: 'off', name: 'Off', enabled: false, countries: ['*'], keywords: [], url: 'https://x.test/' },
+  ] });
+  let r = resolveAffiliates(base({ amazonTag: '', dis: '' }));
+  assert.equal(r.services.length, 2);
+  assert.equal(r.services[0].url, 'https://www.amazon.com/s?k={q}&i=instant-video');
+  assert.equal(r.services[0].aff, false);
+  assert.equal(r.services[1].wrap, null);
+  r = resolveAffiliates(base({ amazonTag: 'mytag-20', dis: 'https://disney.sjv.io/c/1/2/3?u={url}' }));
+  assert.equal(r.services[0].url, 'https://www.amazon.com/s?k={q}&i=instant-video&tag=mytag-20');
+  assert.equal(r.services[0].aff, true);
+  assert.equal(r.services[1].wrap, 'https://disney.sjv.io/c/1/2/3?u={url}');
+  assert.throws(() => validateAffiliates({ myIds: {}, services: [{ id: 'a', name: 'A', countries: ['*'], keywords: [], url: 'http://x.test/' }] }), /https/);
+  assert.throws(() => validateAffiliates({ myIds: {}, services: [{ id: 'a', name: 'A', countries: ['*'], keywords: [], url: 'https://x.test/', affiliate: { add: { tag: '{{nope}}' } } }] }), /not in myIds/);
+});
+
+test('config/affiliates.json is valid', async () => {
+  const { resolveAffiliates } = await import('./affiliates.mjs');
+  const cfg = JSON.parse(await readFile(new URL('../config/affiliates.json', import.meta.url), 'utf8'));
+  const r = resolveAffiliates(cfg);
+  assert.ok(r.services.length > 0);
+});

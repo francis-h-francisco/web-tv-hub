@@ -56,3 +56,17 @@ We don't host or re-stream video. Each channel plays directly from its broadcast
 ## Agents
 
 See [AGENTS.md](AGENTS.md) and [.agent/PROJECT_PREFLIGHT.md](.agent/PROJECT_PREFLIGHT.md).
+
+## Affiliate links ("Where to watch")
+
+When a search or a favorite isn't on free TV, the app suggests legal places to watch it. Those links come
+from [`config/affiliates.json`](config/affiliates.json):
+
+1. Paste your IDs into `myIds` (e.g. your Amazon Associates tag, Apple partner token, or a tracking link
+   from Impact/CJ/Rakuten/Awin with `{url}` where the destination goes). Empty IDs = normal links.
+2. Add, edit or switch off services in `services` (name, link with `{q}` for the search, countries, keywords).
+3. Commit. Tests check the file; the site updates on the next deploy (a few minutes). A broken edit fails
+   the checks and the live site keeps the last good version.
+
+Affiliate links are labelled in the app and use `rel="sponsored"`. Clicks are counted per service, day and
+country (no personal data): see `https://webtv-hub.pages.dev/api/out` for the last 30 days.

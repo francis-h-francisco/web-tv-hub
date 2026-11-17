@@ -160,7 +160,7 @@
         fetch('data/where-to-watch.json').then((r) => r.json()).catch(() => []),
         fetch('data/people.json').then((r) => r.json()).catch(() => ({ cast: {} })),
       ]);
-      S.categories = c.categories; S.wtw = w; S.cast = p.cast || {}; S.generated = c.generated;
+      S.categories = c.categories; S.wtw = Array.isArray(w) ? null : w; S.cast = p.cast || {}; S.generated = c.generated;
       S.raw = c.channels;
       S.all = c.channels.filter(playable);
       S.hiddenForBrowser = c.channels.length - S.all.length;
@@ -1114,7 +1114,7 @@
         '<p>Add favorite shows, movies or stars in your profile and we\'ll list when they\'re on.</p><button class="btn small" data-focus data-goprofile>Open profile</button>') +
       (other.length ? '<p class="small">📱 <b>' + other.map((p) => esc(p.label)).join(', ') + '</b> ' + (other.length > 1 ? 'are' : 'is') + ' on free TV soon, on channels that play on Android TV sticks, phones and Safari but not in this browser.</p>' : '') +
       (missing.length ? '<div class="wtw"><h3>Not on free TV right now</h3><p class="small">' + missing.map((p) => esc(p.label)).join(', ') + '</p>' +
-        missing.slice(0, 3).map((p) => '<a class="btn small" data-focus target="_blank" rel="noopener" href="https://www.justwatch.com/ph/search?q=' + encodeURIComponent(p.label) + '">Where to watch “' + esc(p.label) + '” ↗</a>').join('') + '</div>' : '') +
+        missing.slice(0, 2).map((p) => '<p class="small" style="margin-top:.8rem"><b>' + esc(p.label) + '</b></p>' + wtwButtons(p.label, wtwFor(p.label).list)).join('') + '</div>' : '') +
       '<h3>Reminders (' + rem.length + '/' + FREE_REMINDERS + ')</h3>' +
       (rem.length ? '<div class="list">' + rem.map((r) => '<button class="li" data-focus data-unrem="' + esc(r.ch) + '|' + r.s + '"><span class="when">' + fmtTime(r.s) + '</span><span class="what"><b>' + esc(r.t) + '</b><small>' + esc(r.name) + '</small></span><span class="small">Remove ✕</span></button>').join('') + '</div>' : '<p>No reminders yet. Use 🔔 Remind me on any upcoming show.</p>') +
       (EMAIL_ON ? '<h3>Email reminders</h3><div id="emailBox"><p class="small">Checking…</p></div>' : '') +
@@ -1133,6 +1133,33 @@
   }
 
   // Search with typo tolerance + "where to watch" for things that aren't on free TV
+  // ---------------------------------------------------------------- where to watch (with the owner's affiliate links)
+  // Data: data/where-to-watch.json, built from config/affiliates.json. Affiliate links are labelled and use rel="sponsored".
+  const wtwServices = () => (S.wtw && Array.isArray(S.wtw.services) ? S.wtw.services : []).filter((x) => x.countries.includes('*') || (S.country && x.countries.includes(S.country)));
+  function wtwLink(svc, q) {
+    const dest = svc.url.split('{q}').join(encodeURIComponent(q || ''));
+    if (!svc.wrap) return dest;
+    return svc.wrap.includes('{url}') ? svc.wrap.split('{url}').join(encodeURIComponent(dest)) : svc.wrap;
+  }
+  /** Services for a search: ones known for it first, otherwise the general "Search on ..." ones. */
+  function wtwFor(q) {
+    const f = fold(q || ''); const here = wtwServices();
+    const matched = f ? here.filter((x) => x.keywords.some((k) => { const fk = fold(k); return f.includes(fk) || (f.length > 3 && fk.includes(f)); })) : [];
+    return { matched: matched.length > 0, list: (matched.length ? matched : here.filter((x) => x.suggest)).slice(0, 3) };
+  }
+  function justWatch(q) { return 'https://www.justwatch.com/' + (S.country || 'us').toLowerCase() + '/search?q=' + encodeURIComponent(q || ''); }
+  function wtwButtons(q, list) {
+    const btn = (href, label, svc) => '<a class="btn small" data-focus target="_blank" rel="' + (svc && svc.aff ? 'sponsored noopener' : 'noopener') + '"' + (svc ? ' data-out="' + esc(svc.id) + '"' : '') + ' href="' + esc(href) + '">' + esc(label) + ' ↗</a>';
+    return list.map((x) => btn(wtwLink(x, q), x.url.includes('{q}') ? 'Search on ' + x.name : x.name, x)).join('') +
+      btn(justWatch(q), 'Compare all services (JustWatch)', null) +
+      (list.some((x) => x.aff) && S.wtw.disclosure ? '<p class="small aff-note">' + esc(S.wtw.disclosure) + '</p>' : '');
+  }
+  // anonymous click counts per service and country (no personal data), so the owner can see what's used
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest && e.target.closest('a[data-out]'); if (!a) return;
+    try { navigator.sendBeacon(API + '/out', new Blob([JSON.stringify({ s: a.dataset.out })], { type: 'application/json' })); } catch (err) { /* ignore */ }
+  }, true);
+
   function openSearch() {
     setBottom('search'); loadStars();
     openOverlay('<h2>Search</h2><p>Channels, shows, movies and stars. Typos are OK.</p><input class="field" id="q" data-focus data-autofocus placeholder="Try: frasier, star trek, cartoons, NBA" autocomplete="off" autocapitalize="off" spellcheck="false"><div id="sr" class="results"></div>' +
@@ -1162,11 +1189,9 @@
     const uniq = hits.filter((h) => { const k = h.c.id + (h.p ? h.p.s : ''); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 20);
     let html = '';
     if (res[0] && res[0].s < 0.97 && fold(res[0].e.label) !== f) html += '<p class="small">Showing results for <b>' + esc(res[0].e.label) + '</b></p>';
-    const w = S.wtw.find((x) => x.keywords.some((k) => f.includes(fold(k)) || (f.length > 3 && fold(k).includes(f))));
-    if (w || uniq.length === 0) {
-      const services = w ? w.services : [{ name: 'Search JustWatch (Philippines)', url: 'https://www.justwatch.com/ph/search?q=' + encodeURIComponent(q) }];
-      html += '<div class="wtw"><h3>Where to watch officially' + (w ? ': ' + esc(w.title) : '') + '</h3><p class="small">' + (w ? "This isn't on free TV. You can watch it legally here:" : "We couldn't find this on free TV right now. Check where it streams legally:") + '</p>' +
-        services.map((s) => '<a class="btn small" data-focus target="_blank" rel="noopener" href="' + esc(s.url) + '">' + esc(s.name) + ' ↗</a>').join('') + '</div>';
+    const w = wtwFor(q);
+    if (w.matched || uniq.length === 0) {
+      html += '<div class="wtw"><h3>Where to watch officially</h3><p class="small">' + (uniq.length ? 'Also available on paid services:' : "We couldn't find this on free TV right now. You can watch it legally here:") + '</p>' + wtwButtons(q, w.list) + '</div>';
     }
     if (uniq.length) html += '<div class="list" style="margin-top:1rem">' + uniq.map((h) => '<button class="li" data-focus data-play="' + esc(h.c.id) + '"><span class="when' + (h.p && h.p.s <= Date.now() ? ' live' : '') + '">' + (h.p ? (h.p.s <= Date.now() ? '● LIVE' : fmtTime(h.p.s)) : 'Channel') + '</span><span class="what"><b>' + esc(h.label) + '</b><small>' + esc(h.sub) + '</small></span><span class="small">Watch ▸</span></button>').join('') + '</div>';
     out.innerHTML = html;

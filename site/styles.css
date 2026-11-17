@@ -323,3 +323,6 @@ body { padding-left: var(--sal); padding-right: var(--sar); }
 .unmute { white-space: nowrap; }
 .unmute .on-touch { display: none; }
 @media (pointer: coarse) { .unmute .on-touch { display: inline; } .unmute .on-tv { display: none; } }
+
+.wtw .btn.small { margin: .25rem .35rem .25rem 0; }
+.aff-note { opacity: .75; margin-top: .6rem; font-size: .78rem; }
