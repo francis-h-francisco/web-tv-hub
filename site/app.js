@@ -577,7 +577,7 @@
     }
     const next = nx ? '<div class="r-next"><em>NEXT ' + fmtTime(nx.s) + '</em><span>' + esc(nx.t) + '</span></div>' : '<div class="r-next"></div>';
     const tags = S.favs.has(c.id) ? '<span class="tag">★</span>' : '';
-    return '<button class="row' + (playing ? ' playing' : '') + '" data-focus data-ch="' + esc(c.id) + '">' +
+    return '<button class="row' + (playing ? ' playing' : '') + '" data-focus data-ch="' + esc(c.id) + '"' + ((c.streams || []).some((x) => x.cors === true) ? '' : ' data-nocast') + '>' +
       '<div class="r-logo">' + (c.logo ? '<img loading="lazy" alt="" src="' + esc(c.logo) + '" data-i="' + initials + '">' : '<span>' + initials + '</span>') + '</div>' +
       '<div class="r-main"><div class="r-name"><b>' + esc(c.name) + '</b>' + tags + (playing ? '<span class="r-watching">▶ WATCHING</span>' : '') + '</div>' + now + '</div>' + next + '</button>';
   }
@@ -645,7 +645,7 @@
     if (ch.category !== 'byo') store.set('last', ch.id);
     S.attempts = plan(ch, true); S.attempt = 0;
     renderNow(); renderTimeline(); refreshGuideTimes(); osd(); notifyChange();
-    if (castState.session) { stopPlayback(); castCurrent(); return; }
+    if (castConnected()) { stopPlayback(); castCurrent(); return; }
     if (!S.attempts.length) { failChannel("This channel can't play in this browser."); return; }
     tryAttempt();
   }
@@ -710,6 +710,7 @@
   S.paused = false;
   function togglePause() {
     if (!S.current) return;
+    if (castConnected()) { castCmd('pause'); return; }
     if (!S.paused) {
       S.paused = true; video.pause(); if (S.hls) try { S.hls.stopLoad(); } catch (e) { /* ignore */ }
       toast('⏸ Paused. Press play to go back to live.', null, 2500, 'pause');
@@ -728,6 +729,7 @@
     updateControls();
   }
   function toggleMute() {
+    if (castConnected()) { castCmd('mute'); return; }
     if (video.muted) { unmuteFromUser(); } else { video.muted = true; }
     updateControls();
   }
@@ -1392,46 +1394,122 @@
   // ---------------------------------------------------------------- Chromecast
   // Uses Google's default Cast receiver, which loads the stream itself, so only streams that allow
   // other sites to read them (CORS) can be cast. The button only appears where casting is available.
-  const castState = { ctx: null, session: null };
+  // Two ways to cast, same buttons: Chrome's web Cast SDK, or the Android app's native Cast (WthCast plugin,
+  // Google's official Cast SDK). While casting, the phone shows a remote: channels, pause, volume, stop.
+  const castState = { ctx: null, session: null, native: null, n: null, muted: false };
+  const castConnected = () => !!castState.session || !!(castState.n && castState.n.state === 'connected');
+  const castDevice = () => (castState.session ? castState.session.getCastDevice().friendlyName : (castState.n && castState.n.device) || 'your TV');
+  function showCastButtons(on) {
+    const b = $('#castBtn'); if (b) b.hidden = !on;
+    const t = $('#castTop'); if (t) { t.hidden = !on; t.classList.toggle('on', castConnected()); t.textContent = castConnected() ? '📡 Casting' : '📡'; t.setAttribute('aria-label', castConnected() ? 'Casting to ' + castDevice() + '. Tap for options' : 'Cast to a TV'); }
+  }
   function initCast() {
+    const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.WthCast;
+    if (P) {
+      P.initialize().then((st) => {
+        if (!st || !st.available) return;
+        castState.native = P; onNativeState(st);
+        P.addListener('state', onNativeState);
+      }).catch(() => {});
+      return;
+    }
     if (!/Chrome|CriOS/.test(UA) || /Edg|OPR/.test(UA) || window.Capacitor) return;
     window.__onGCastApiAvailable = (ok) => {
       if (!ok || !window.cast || !cast.framework) return;
       const ctx = cast.framework.CastContext.getInstance();
       ctx.setOptions({ receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID, autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED });
       castState.ctx = ctx;
-      const btn = $('#castBtn'); if (btn) btn.hidden = false;
+      showCastButtons(true);
       ctx.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, (ev) => {
         const st = ev.sessionState, SS = cast.framework.SessionState;
         if (st === SS.SESSION_STARTED || st === SS.SESSION_RESUMED) { castState.session = ctx.getCurrentSession(); castCurrent(); }
-        if (st === SS.SESSION_ENDED) { castState.session = null; $('#castBtn').classList.remove('on'); setMsg(''); const p = video.play(); if (p && p.catch) p.catch(() => {}); }
+        if (st === SS.SESSION_ENDED) { castState.session = null; castEnded(); }
       });
     };
     const s = document.createElement('script'); s.src = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1'; s.async = true; document.head.appendChild(s);
   }
+  function onNativeState(st) {
+    const was = castConnected();
+    castState.n = st;
+    showCastButtons(st.state !== 'no_devices' && st.state !== 'unavailable');
+    const now = castConnected();
+    if (now && !was) castCurrent();
+    else if (!now && was) castEnded();
+    if (now) {
+      castState.muted = !!st.muted;
+      S.paused = st.player === 'paused';
+      if (st.error && !castState.errShown) { castState.errShown = true; toast((S.current ? esc(S.current.name) : 'This channel') + " didn't start on your TV. Try another channel.", null, 4500, 'cast'); }
+      renderCastbar();
+    }
+  }
   function castable(ch) { return ch && (ch.streams || []).find((s) => s.cors === true); }
   async function castClick() {
+    if (castState.native) { castState.native.showPicker().catch(() => {}); return; }
     if (!castState.ctx) return;
     if (!castable(S.current)) { toast("This channel can't be sent to a Chromecast. Most other channels can.", null, 4000, 'cast'); return; }
     if (castState.session) { castCurrent(); return; }
     try { await castState.ctx.requestSession(); } catch (e) { /* user closed the device picker */ }
   }
   function castCurrent() {
-    const sess = castState.session, ch = S.current; if (!sess || !ch) return;
+    const ch = S.current; if (!ch || !castConnected()) return;
     const s = castable(ch);
-    if (!s) { toast(esc(ch.name) + " can't be cast. Pick another channel to send it to your TV.", null, 4000, 'cast'); return; }
+    if (!s) { renderCastbar(esc(ch.name) + " can't be cast. Pick another channel and your TV will play it."); toast(esc(ch.name) + " can't be cast. Pick another channel to send it to your TV.", null, 4000, 'cast'); return; }
+    const np = nowProg(ch);
+    const ok = () => { stopPlayback(); S.paused = false; castState.errShown = false; renderCastbar(); };
+    const fail = () => toast("Your TV couldn't play " + esc(ch.name) + '. Try another channel.', null, 4000, 'cast');
+    if (castState.native) {
+      castState.native.load({ url: s.url, title: np ? np.t : ch.name, subtitle: ch.name, image: ch.logo || '' }).then(ok, fail);
+      return;
+    }
+    const sess = castState.session;
     const info = new chrome.cast.media.MediaInfo(s.url, 'application/x-mpegURL');
     info.streamType = chrome.cast.media.StreamType.LIVE;
     const md = new chrome.cast.media.GenericMediaMetadata();
-    const np = nowProg(ch); md.title = np ? np.t : ch.name; md.subtitle = ch.name;
+    md.title = np ? np.t : ch.name; md.subtitle = ch.name;
     if (ch.logo) md.images = [new chrome.cast.Image(ch.logo)];
     info.metadata = md;
     const req = new chrome.cast.media.LoadRequest(info); req.autoplay = true;
-    sess.loadMedia(req).then(() => {
-      video.pause(); $('#castBtn').classList.add('on');
-      setMsg('📡 Playing on ' + sess.getCastDevice().friendlyName + '. Change channels here and the TV follows.');
-    }, () => toast("Your TV couldn't play " + esc(ch.name) + '. Try another channel.', null, 4000, 'cast'));
+    sess.loadMedia(req).then(ok, fail);
   }
+  function castEnded() {
+    $('#castbar').hidden = true; document.body.classList.remove('casting'); showCastButtons(!!(castState.native || castState.ctx));
+    setMsg(''); S.paused = false; updateControls();
+    if (S.current) { toast('📱 Back to watching on this screen.', null, 2500, 'cast'); play(S.current, { list: S.list }); }
+  }
+  function renderCastbar(note) {
+    if (!castConnected()) return;
+    document.body.classList.add('casting'); showCastButtons(true);
+    $('#castbar').hidden = false;
+    $('#cbDev').textContent = '📡 Playing on ' + castDevice();
+    const ch = S.current, np = ch && nowProg(ch);
+    $('#cbWhat').innerHTML = note || (ch ? '<b>' + esc(ch.name) + '</b>' + (np ? ' · ' + esc(np.t) : '') : '');
+    $('#cbPause').textContent = S.paused ? '▶' : '⏸'; $('#cbPause').setAttribute('aria-label', S.paused ? 'Play' : 'Pause');
+    $('#cbMute').classList.toggle('on', castState.muted);
+  }
+  function castCmd(k) {
+    const P = castState.native, sess = castState.session;
+    const media = sess && sess.getMediaSession && sess.getMediaSession();
+    if (k === 'prev') zap(-1);
+    else if (k === 'next') zap(1);
+    else if (k === 'stop') { if (P) P.stop(); else if (castState.ctx) castState.ctx.endCurrentSession(true); }
+    else if (k === 'pause') {
+      S.paused = !S.paused;
+      if (P) (S.paused ? P.pause() : P.play()).catch(() => {});
+      else if (media) S.paused ? media.pause(null, () => {}, () => {}) : media.play(null, () => {}, () => {});
+      renderCastbar();
+    } else if (k === 'mute') {
+      castState.muted = !castState.muted;
+      if (P) P.setMuted({ muted: castState.muted }).catch(() => {}); else if (sess) sess.setMute(castState.muted);
+      renderCastbar();
+    } else if (k === 'volup' || k === 'voldown') {
+      const d = k === 'volup' ? 0.1 : -0.1;
+      if (P) P.changeVolume({ delta: d }).catch(() => {});
+      else if (sess) sess.setVolume(Math.max(0, Math.min(1, sess.getVolume() + d)));
+    }
+  }
+  // the remote covers the player: its taps must not toggle full screen or the player controls
+  $('#castbar').addEventListener('click', (e) => { e.stopPropagation(); const b = e.target.closest('[data-cb]'); if (b) castCmd(b.dataset.cb); });
+  $('#castbar').addEventListener('dblclick', (e) => e.stopPropagation());
 
   // ---------------------------------------------------------------- share (rich-preview links)
   const SITE = location.origin + location.pathname.replace(/[^/]*$/, '');

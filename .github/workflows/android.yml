@@ -37,6 +37,18 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      - name: Add Chromecast (Google Cast SDK) to the Android project
+        run: |
+          set -e
+          JAVA_DIR=app/android/app/src/main/java/io/github/francishfrancisco/webtvhub
+          test -f $JAVA_DIR/MainActivity.java
+          cp app/native/*.java $JAVA_DIR/
+          # Cast SDK + MediaRouter (device picker)
+          printf '\ndependencies {\n    implementation "com.google.android.gms:play-services-cast-framework:22.1.0"\n    implementation "androidx.mediarouter:mediarouter:1.7.0"\n}\n' >> app/android/app/build.gradle
+          MANIFEST=app/android/app/src/main/AndroidManifest.xml
+          sed -i 's#</application>#    <meta-data android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME" android:value="io.github.francishfrancisco.webtvhub.CastOptionsProvider" />\n    </application>#' $MANIFEST
+          grep -n "OPTIONS_PROVIDER" $MANIFEST
+
       - name: App icons and version
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick librsvg2-bin > /dev/null
@@ -55,12 +67,18 @@ jobs:
       - name: Build APK
         working-directory: app/android
         env:
+          SIGNING: ${{ secrets.ANDROID_SIGNING }}
           KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
           KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
+          # One secret is enough: ANDROID_SIGNING = "<password>:<keystore as base64>" (alias webtvhub)
+          if [ -n "$SIGNING" ]; then
+            KS_PASS="${SIGNING%%:*}"; KS_B64="${SIGNING#*:}"; KEY_ALIAS=webtvhub; KEY_PASS="$KS_PASS"
+            echo "::add-mask::$KS_PASS"
+          fi
           if [ -n "$KS_B64" ]; then
             echo "$KS_B64" | base64 -d > release.jks
             ./gradlew --no-daemon assembleRelease
@@ -110,7 +128,16 @@ jobs:
           curl -sf --request POST --url https://www.virustotal.com/api/v3/files --header "x-apikey: $VT" --form file=@web-tv-hub.apk > vt.json && \
             node -e 'const fs=require("fs");const s=JSON.parse(fs.readFileSync("scan.json"));s.virustotal.uploaded=true;fs.writeFileSync("scan.json",JSON.stringify(s,null,2));' || echo "VirusTotal upload failed"
 
+      - name: Keep the test build (no permanent signing key yet, so nothing is published)
+        if: env.SIGNING != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-tv-hub-test-build
+          path: web-tv-hub.apk
+          retention-days: 7
+
       - name: Publish release
+        if: env.SIGNING == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

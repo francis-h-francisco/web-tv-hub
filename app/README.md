@@ -24,3 +24,17 @@ uninstalling the old one first. To sign every build with the same key, add these
 | `ANDROID_KEY_PASSWORD` | key password |
 
 Optional: `VIRUSTOTAL_API_KEY` (free account) uploads each APK to VirusTotal automatically.
+
+## Chromecast
+
+`native/` holds a small Capacitor plugin (`WthCastPlugin`, exposed to the web app as `Capacitor.Plugins.WthCast`)
+built on Google's official Cast SDK (`play-services-cast-framework`). The workflow copies it into the generated
+Android project, adds the SDK dependencies and registers `CastOptionsProvider` in the manifest. It uses Google's
+free Default Media Receiver, so only channels whose streams allow it (CORS) can be cast; the app dims the others
+while casting. While casting, the phone's volume buttons control the TV.
+
+## Signing
+
+One GitHub secret, `ANDROID_SIGNING` = `<password>:<keystore as base64>` (key alias `webtvhub`). Without it the
+workflow still builds and scans the app as a test build but publishes nothing, so no one installs a build that
+would later need uninstalling.

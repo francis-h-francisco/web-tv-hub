@@ -32,6 +32,7 @@
     <button class="navbtn" data-focus data-action="more">More</button>
   </nav>
   <div class="clock" id="clock"></div>
+  <button class="castbtn" data-action="cast" id="castTop" aria-label="Cast to a TV" hidden>📡</button>
   <button class="tvbtn" data-action="remote" aria-label="Use this phone as a TV remote">📺 Control TV</button>
 </header>
 
@@ -41,6 +42,19 @@
       <video id="video" playsinline muted autoplay></video>
       <div class="player-msg" id="playerMsg"></div>
       <button class="unmute" id="unmute" hidden>🔇 <span class="on-touch">Tap for sound</span><span class="on-tv">Tap or press OK for sound</span></button>
+      <div class="castbar" id="castbar" hidden>
+        <div class="cb-dev" id="cbDev">📡 Casting</div>
+        <div class="cb-what" id="cbWhat"></div>
+        <div class="cb-row">
+          <button class="pbtn" data-cb="prev" aria-label="Previous channel">⏮</button>
+          <button class="pbtn" data-cb="pause" id="cbPause" aria-label="Pause">⏸</button>
+          <button class="pbtn" data-cb="next" aria-label="Next channel">⏭</button>
+          <button class="pbtn" data-cb="voldown" aria-label="Volume down">🔉</button>
+          <button class="pbtn" data-cb="mute" id="cbMute" aria-label="Mute">🔇</button>
+          <button class="pbtn" data-cb="volup" aria-label="Volume up">🔊</button>
+        </div>
+        <button class="btn small" data-cb="stop">Stop casting</button>
+      </div>
       <div class="pctl" id="pctl">
         <button class="pbtn" data-focus data-action="pause" id="pauseBtn" aria-label="Pause">⏸</button>
         <button class="pbtn" data-focus data-action="mute" id="muteBtn" aria-label="Mute">🔊</button>
