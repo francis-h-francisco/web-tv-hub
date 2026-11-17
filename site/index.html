@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0d12">
+<meta name="description" content="Free, curated live TV from channels that broadcasters stream for free. Built for TVs and remotes.">
+<title>Web TV Hub — Free curated live TV</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-dot"></span>Web TV Hub</div>
+  <nav class="topnav">
+    <button class="navbtn" data-focus data-action="search">Search</button>
+    <button class="navbtn" data-focus data-action="profile">My profile</button>
+    <button class="navbtn" data-focus data-action="settings">My playlist</button>
+    <button class="navbtn" data-focus data-action="about">About</button>
+  </nav>
+  <div class="clock" id="clock"></div>
+</header>
+
+<main>
+  <section class="stage">
+    <div class="player" id="player">
+      <video id="video" playsinline muted autoplay></video>
+      <div class="player-msg" id="playerMsg"></div>
+      <div class="unmute" id="unmute" hidden>Sound is off — press OK or tap to turn it on</div>
+    </div>
+    <aside class="nowinfo">
+      <div class="now-ch">
+        <img id="nowLogo" alt="" hidden>
+        <div>
+          <div class="now-chname" id="nowName">Loading channels…</div>
+          <div class="now-meta" id="nowMeta"></div>
+        </div>
+      </div>
+      <div class="now-actions">
+        <button class="act" data-focus data-action="fav" id="favBtn">☆ Favorite</button>
+        <button class="act" data-focus data-action="fullscreen">⛶ Full screen</button>
+        <button class="act" data-focus data-action="next">Next ▸</button>
+        <button class="act" data-focus data-action="cc" id="ccBtn" hidden>CC</button>
+      </div>
+      <div class="nowprog" id="nowProg"></div>
+      <p class="hint">Arrows to move · OK to watch · in full screen, ▲▼ change channel · Back to return</p>
+    </aside>
+  </section>
+
+  <section class="epg" id="epg" aria-label="Schedule"></section>
+
+  <section id="rows"></section>
+
+  <footer class="foot">
+    <p>We don't host any video. Every channel is streamed by its broadcaster or an official free (FAST) service and opened directly in your browser. Channel data: <a href="https://github.com/iptv-org/iptv" target="_blank" rel="noopener">iptv-org</a>. Some channels may not play in your country.</p>
+    <p id="updated"></p>
+  </footer>
+</main>
+
+<div class="overlay" id="overlay" hidden><div class="panel" id="panel"></div></div>
+<div class="toasts" id="toasts"></div>
+
+<script src="vendor/hls.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

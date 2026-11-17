@@ -1,0 +1,9 @@
+{
+  "name": "Web TV Hub",
+  "short_name": "TV Hub",
+  "start_url": "./",
+  "display": "fullscreen",
+  "background_color": "#0b0d12",
+  "theme_color": "#0b0d12",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

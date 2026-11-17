@@ -1,0 +1,224 @@
+{
+  "_doc": "Curation rules for the 6-hourly refresh. See docs/PLAYBOOK.md section 5A. Edit and push; the next run applies them.",
+  "siteOrigin": "https://francis-h-francisco.github.io",
+  "languages": [
+    "eng",
+    "fil",
+    "tgl"
+  ],
+  "alwaysIncludeCountries": [
+    "PH"
+  ],
+  "excludeCategories": [
+    "religious",
+    "xxx",
+    "shop",
+    "legislative",
+    "interactive"
+  ],
+  "categoryMap": [
+    {
+      "id": "sports",
+      "name": "Sports",
+      "from": [
+        "sports"
+      ]
+    },
+    {
+      "id": "news",
+      "name": "News",
+      "from": [
+        "news"
+      ]
+    },
+    {
+      "id": "animations",
+      "name": "Animations",
+      "from": [
+        "animation",
+        "kids"
+      ]
+    },
+    {
+      "id": "sitcoms",
+      "name": "Sitcoms",
+      "from": [
+        "comedy"
+      ]
+    },
+    {
+      "id": "movies",
+      "name": "Movies",
+      "from": [
+        "movies"
+      ]
+    },
+    {
+      "id": "series",
+      "name": "TV Series",
+      "from": [
+        "series",
+        "classic",
+        "entertainment"
+      ]
+    }
+  ],
+  "maxPerCategory": 60,
+  "news": {
+    "international": [
+      "BBCNews.uk",
+      "DW.de"
+    ],
+    "internationalMax": 2,
+    "localCountry": "PH",
+    "localMax": 3,
+    "localPreferred": [
+      "PTV4.ph",
+      "UNTV.ph",
+      "AbanteTV.ph",
+      "BilyonaryoNewsChannel.ph",
+      "CLTV36.ph"
+    ]
+  },
+  "extraChannels": {
+    "_doc": "Channels outside the 6 source categories to force into a category, e.g. CLTV36 (general) into news.",
+    "CLTV36.ph": "news"
+  },
+  "sourcePolicy": {
+    "allowWebsiteDomainMatch": true,
+    "trustedHosts": [
+      "amagi.tv",
+      "wurl.tv",
+      "wurl.com",
+      "tubi.video",
+      "ottera.tv",
+      "sofast.tv",
+      "akamaized.net",
+      "akamaihd.net",
+      "cloudfront.net",
+      "streamlock.net",
+      "france24.com",
+      "getaj.net",
+      "thehlive.com",
+      "cbsnews.com",
+      "rtve.es",
+      "bbci.co.uk",
+      "pluto.tv",
+      "plex.tv",
+      "rakuten.tv",
+      "frequency.stream",
+      "cltv36.tv"
+    ],
+    "fastRedirectors": [
+      "jmp2.uk"
+    ],
+    "deniedHosts": [
+      "tangotv.in",
+      "ektv.in",
+      "pishow.tv",
+      "cinerama.uz",
+      "aynaott.com",
+      "smartplaytv.in",
+      "freem3u.xyz",
+      "bozztv.com",
+      "antik.sk",
+      "githubusercontent.com",
+      "uplink.kz",
+      "onetv.app",
+      "dens.tv",
+      "persiana.live",
+      "iptvperu.tv",
+      "cdn-redge.media",
+      "kdlc.click"
+    ]
+  },
+  "denyChannels": [],
+  "health": {
+    "timeoutMs": 9000,
+    "concurrency": 24,
+    "maxStreamsTriedPerChannel": 3,
+    "requireCors": true
+  },
+  "epg": {
+    "pastHours": 3,
+    "futureHours": 26,
+    "sources": [
+      {
+        "name": "PlutoTV",
+        "url": "https://i.mjh.nz/PlutoTV/all.xml.gz",
+        "streamPattern": "^https://jmp2\\.uk/plu-([0-9a-f]+)"
+      },
+      {
+        "name": "SamsungTVPlus",
+        "url": "https://i.mjh.nz/SamsungTVPlus/all.xml.gz",
+        "streamPattern": "^https://jmp2\\.uk/stvp-([A-Za-z0-9]+)"
+      }
+    ]
+  },
+  "whereToWatch": [
+    {
+      "keywords": [
+        "nba",
+        "basketball",
+        "lakers",
+        "warriors",
+        "celtics"
+      ],
+      "title": "Live NBA games",
+      "services": [
+        {
+          "name": "NBA League Pass",
+          "url": "https://www.nba.com/watch/league-pass-stream"
+        }
+      ]
+    },
+    {
+      "keywords": [
+        "disney",
+        "marvel",
+        "pixar",
+        "star wars",
+        "bluey"
+      ],
+      "title": "Disney, Marvel & Pixar",
+      "services": [
+        {
+          "name": "Disney+",
+          "url": "https://www.disneyplus.com/"
+        }
+      ]
+    },
+    {
+      "keywords": [
+        "cartoon network",
+        "hbo",
+        "friends",
+        "game of thrones",
+        "the last of us"
+      ],
+      "title": "HBO & Warner Bros. shows",
+      "services": [
+        {
+          "name": "JustWatch (Philippines)",
+          "url": "https://www.justwatch.com/ph/search?q=hbo"
+        }
+      ]
+    },
+    {
+      "keywords": [
+        "young sheldon",
+        "big bang theory",
+        "malcolm in the middle",
+        "titanic",
+        "gladiator"
+      ],
+      "title": "Movies & sitcoms on paid services",
+      "services": [
+        {
+          "name": "JustWatch (Philippines)",
+          "url": "https://www.justwatch.com/ph"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+name: Refresh channels and deploy
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # every 6 hours (minute 17 avoids the top-of-hour rush)
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Unit tests
+        run: npm test
+      - name: Fetch, curate, health-check and build guide data
+        run: node pipeline/build.mjs --out site/data
+      - name: Sanity check output
+        run: |
+          node -e "const d=require('./site/data/channels.json'); if (d.channels.length < 50) { console.error('Only', d.channels.length, 'channels - refusing to deploy'); process.exit(1) } console.log(d.channels.length, 'channels')"
+          cat site/data/report.json
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
