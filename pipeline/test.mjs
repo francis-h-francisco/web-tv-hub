@@ -52,7 +52,8 @@ test('news caps', () => {
   const mk = (id, country) => ({ id, name: id, country, category: 'news', streams: [{}] });
   const list = [mk('BBCNews.uk', 'GB'), mk('DW.de', 'DE'), mk('CNN.us', 'US'), mk('AbanteTV.ph', 'PH'), mk('CLTV36.ph', 'PH'), mk('X.ph', 'PH'), mk('Y.ph', 'PH')];
   const out = applyCaps(list, config).map((c) => c.id);
-  assert.deepEqual(out, ['BBCNews.uk', 'DW.de', 'AbanteTV.ph', 'CLTV36.ph', 'X.ph']);
+  // international for everyone + up to 3 local news channels per country (the app shows the viewer's own)
+  assert.deepEqual(out, ['BBCNews.uk', 'DW.de', 'CNN.us', 'AbanteTV.ph', 'CLTV36.ph', 'X.ph']);
 });
 
 test('xmltv parsing', () => {
@@ -84,4 +85,16 @@ test('title normalization and genres', () => {
   assert.equal(normTitle('Pokémon: Season 3'), 'pokemon');
   assert.equal(genreLabel('Science fiction'), 'Sci-fi');
   assert.equal(genreLabel('Series'), null);
+});
+
+import { guessLang, primaryLang } from './lib.mjs';
+test('language guess from schedule text', () => {
+  const en = Array.from({ length: 10 }, () => ({ t: 'The Big Show', d: 'A man and his dog travel to the coast with their friends in this story of the sea.' }));
+  const es = Array.from({ length: 10 }, () => ({ t: 'El Gran Show', d: 'Un hombre y su perro viajan a la costa con los amigos para una historia del mar que es como ninguna.' }));
+  assert.equal(guessLang(en), 'eng');
+  assert.equal(guessLang(es), 'spa');
+  assert.equal(guessLang([{ t: 'News' }]), null);
+});
+test('primary language is the main audio track', () => {
+  assert.equal(primaryLang({ streams: [{ lang: 'hin' }], languages: ['hin', 'eng'] }), 'hin');
 });

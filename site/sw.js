@@ -1,7 +1,6 @@
-// Offline app shell. Channel data is network-first so the guide is always fresh;
-// the app files are cache-first so it opens instantly, even on a slow TV stick.
-const VERSION = 'wth-v2';
-const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'vendor/hls.min.js', 'icon.svg', 'icon-192.png', 'manifest.webmanifest'];
+// Offline app shell: everything is network-first (always fresh), with the cached copy used when offline.
+const VERSION = 'wth-v3';
+const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'remote.js', 'vendor/hls.min.js', 'icon.svg', 'icon-192.png', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -16,9 +15,6 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(fetch(e.request).then((r) => { const copy = r.clone(); caches.open(VERSION).then((c) => c.put(e.request, copy)); return r; }).catch(() => caches.match(e.request)));
     return;
   }
-  // app files: serve cached, refresh in the background
-  e.respondWith(caches.match(e.request).then((hit) => {
-    const net = fetch(e.request).then((r) => { if (r.ok) { const copy = r.clone(); caches.open(VERSION).then((c) => c.put(e.request, copy)); } return r; }).catch(() => hit);
-    return hit || net;
-  }));
+  // app files: fresh from the network when online (updates show immediately), cached copy when offline
+  e.respondWith(fetch(e.request).then((r) => { if (r.ok) { const copy = r.clone(); caches.open(VERSION).then((c) => c.put(e.request, copy)); } return r; }).catch(() => caches.match(e.request)));
 });

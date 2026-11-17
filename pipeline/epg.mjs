@@ -11,6 +11,7 @@ export async function buildEpg(channels, epgConfig, log) {
   const epg = {};
   const via = {};
   const meta = {}; // our channel id -> { desc, group } from the platform's own channel list
+  const how = {};  // our channel id -> 'id' (exact stream match) | 'name'
 
   for (const src of epgConfig.sources) {
     let xml;
@@ -25,6 +26,7 @@ export async function buildEpg(channels, epgConfig, log) {
       continue;
     }
     const want = new Map(); // listing id -> our channel id
+    const byNameIds = new Set();
     if (src.streamPattern) {
       const re = new RegExp(src.streamPattern);
       for (const c of channels) {
@@ -41,7 +43,7 @@ export async function buildEpg(channels, epgConfig, log) {
       for (const c of channels) {
         if (epg[c.id] || [...want.values()].includes(c.id)) continue;
         const id = byName.get(normName(c.name));
-        if (id && !want.has(id)) want.set(id, c.id);
+        if (id && !want.has(id)) { want.set(id, c.id); byNameIds.add(id); }
       }
     }
     if (!want.size) continue;
@@ -51,13 +53,13 @@ export async function buildEpg(channels, epgConfig, log) {
     for (const [xid, list] of Object.entries(parsed)) {
       const cid = want.get(xid);
       if (epg[cid] || !hasNowish(list, now)) continue;
-      epg[cid] = list; via[cid] = src.name; added++;
+      epg[cid] = list; via[cid] = src.name; how[cid] = byNameIds.has(xid) ? 'name' : 'id'; added++;
       const m = info.get(xid);
       if (m && m.desc && !meta[cid]) meta[cid] = m;
     }
     log(`epg ${src.name}: ${added} channels`);
   }
-  return { epg, via, meta };
+  return { epg, via, meta, how };
 }
 
 // A guide is only useful if it covers the present; otherwise it's stale or for another feed.

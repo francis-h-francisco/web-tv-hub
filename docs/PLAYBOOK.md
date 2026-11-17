@@ -89,6 +89,19 @@ Large, high-contrast cards; arrow keys, OK/Enter and Back; also mouse and touch.
 - **Favorite shows, movies and stars.** Typo-tolerant autosuggest from the live schedule, with cast lists from Wikidata (CC0). My TV shows when picks air, and for picks that aren't on free TV it links to JustWatch.
 - **Captions removed** until channels provide reliable ones.
 
+## 8c. v1.2 additions (2026-11-17)
+- **Location-aware guide (no fake listings).** The app detects the viewer's country (Cloudflare's public trace endpoint, falling back to the time zone; changeable in the profile). It hides channels not offered there, using the per-country lists that Pluto TV, Samsung TV Plus and Plex publish, iptv-org's region-lock labels, and local-news-per-country. Pluto TV and Samsung TV Plus aren't offered in the Philippines, so their 300+ channels no longer appear there.
+- **No VPN.** Routing video through other countries would get around broadcasters' licensing and turn us into a re-streamer: legally risky, and bandwidth costs money. We filter by location instead.
+- **Language you actually hear.** A channel counts as English only if English is its main audio track. Schedules written in another language either relabel the channel (exact match) or are dropped (name match).
+- **No country gets priority.** Local news follows the viewer's location.
+- **Stars directory.** About 3,800 well-known actors, comedians and presenters from Wikidata, so any star can be picked even when nothing of theirs airs today.
+- **Phone remote without an account.** The TV shows a QR code and a 6-letter code, and the phone connects peer-to-peer (WebRTC; PeerJS's free public broker only introduces them).
+- **Android app.** A Capacitor shell around the web app, adding notifications that fire even when the app is closed. Every build is made by GitHub Actions, scanned with ClamAV (never published if anything is found), and published with a SHA-256 checksum and a VirusTotal link on `download.html`.
+
+## 8d. Email reminders and marketing consent (planned; needs the Worker backend)
+- Email reminders need a server: something to store addresses and send at the right time. That's the Cloudflare Worker + D1 phase, plus an email sender.
+- Consent rules we follow (Philippine Data Privacy Act; GDPR for EU visitors; CAN-SPAM): reminder emails never require marketing consent. Marketing is a **separate, unticked** checkbox that names who will email (e.g. "Web TV Hub and [named sister brands]"), with a one-click unsubscribe in every email and a privacy notice saying exactly how addresses are used. No bundled or disguised consent: it's invalid under these laws and the list would be legally unusable.
+
 ## 9. Delivery plan
 - **v1 (this build):** static site on GitHub Pages; 6-hourly Actions refresh; curation + source policy + health check; EPG for FAST channels; D-pad UI; onboarding; favorites; 3 reminders; BYO playlist; where-to-watch card.
 - **v1.1 (done):** QR "open on another screen"; installable PWA; items in 8b. Still open: Cloudflare Pages mirror.

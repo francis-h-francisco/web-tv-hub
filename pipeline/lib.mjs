@@ -84,7 +84,7 @@ export function curate(data, config) {
     if (!category) { bump('noCategory'); continue; }
     const feed = (s.feed && feedById.get(ch.id + '@' + s.feed)) || mainFeed.get(ch.id);
     const chLangs = feed?.languages || [];
-    if (!countries.has(ch.country) && !chLangs.some((l) => langs.has(l))) { bump('language'); continue; }
+    if (!countries.has(ch.country) && !langs.has(chLangs[0])) { bump('language'); continue; }
     const source = classifySource(s.url, ch.website, config.sourcePolicy);
     if (source === 'denied' || source === 'unknown') { bump('source_' + source); continue; }
 
@@ -103,7 +103,7 @@ export function curate(data, config) {
       };
       out.set(ch.id, entry);
     }
-    for (const l of chLangs) if (!entry.languages.includes(l)) entry.languages.push(l);
+    if (chLangs[0] && !entry.languages.includes(chLangs[0])) entry.languages.push(chLangs[0]);
     entry.streams.push({
       url: s.url,
       lang: chLangs[0] || undefined,
@@ -132,9 +132,19 @@ export function applyCaps(channels, config) {
   }
   const news = byCat.get('news') || [];
   const intl = n.international.map((id) => news.find((c) => c.id === id)).filter(Boolean).slice(0, n.internationalMax);
-  const localPool = news.filter((c) => c.country === n.localCountry);
-  localPool.sort((a, b) => rankIn(n.localPreferred, a.id) - rankIn(n.localPreferred, b.id));
-  byCat.set('news', [...intl, ...localPool.slice(0, n.localMax)]);
+  intl.forEach((c) => { c.news = 'intl'; });
+  const byCountry = new Map();
+  for (const c of news) {
+    if (intl.includes(c)) continue;
+    if (!byCountry.has(c.country)) byCountry.set(c.country, []);
+    byCountry.get(c.country).push(c);
+  }
+  const local = [];
+  for (const list of byCountry.values()) {
+    list.sort((a, b) => rankIn(n.localPreferred, a.id) - rankIn(n.localPreferred, b.id) || score(b) - score(a));
+    for (const c of list.slice(0, n.localMax)) { c.news = 'local'; local.push(c); }
+  }
+  byCat.set('news', [...intl, ...local]);
 
   const result = [];
   for (const cat of config.categoryMap) {
@@ -145,8 +155,8 @@ export function applyCaps(channels, config) {
     // cap per category *and* language so other languages don't crowd out English (the default)
     const used = {};
     for (const c of list) {
-      const lang = primaryLang(c, config);
-      const cap = lang === 'eng' || c.country === 'PH' ? config.maxPerCategory : (config.maxPerCategoryOtherLanguage || 15);
+      const lang = primaryLang(c);
+      const cap = lang === 'eng' ? config.maxPerCategory : (config.maxPerCategoryOtherLanguage || 15);
       used[lang] = (used[lang] || 0) + 1;
       if (used[lang] <= cap) result.push(c);
     }
@@ -154,16 +164,15 @@ export function applyCaps(channels, config) {
   return result;
 }
 
-export function primaryLang(c, config) {
-  const l = c.languages || [];
-  if (l.includes('eng')) return 'eng';
-  return l.find((x) => config.languages.includes(x)) || l[0] || 'und';
+/** Main audio language of the stream we'll actually play. */
+export function primaryLang(c) {
+  return c.streams?.[0]?.lang || c.languages?.[0] || 'und';
 }
 
 function rankIn(arr, id) { const i = arr.indexOf(id); return i < 0 ? 999 : i; }
 function score(c) {
   const s = c.streams[0] || {};
-  return (c.country === 'PH' ? 4 : 0) + (s.source === 'website' ? 2 : s.source === 'trusted' ? 1 : 0) +
+  return (s.source === 'website' ? 2 : s.source === 'trusted' ? 1 : 0) +
     (s.not247 ? -2 : 0) + (c.logo ? 1 : 0) + (s.cors ? 1 : 0);
 }
 
@@ -294,3 +303,26 @@ export function describeChannel(c, programmes = [], meta = null) {
 
 function joinWords(a) { return a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
 function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+const STOP = {
+  eng: ['the', 'and', 'of', 'to', 'in', 'is', 'with', 'his', 'her', 'when', 'from', 'their', 'this', 'for'],
+  spa: ['el', 'los', 'las', 'del', 'que', 'una', 'por', 'con', 'para', 'su', 'se', 'es', 'como'],
+  por: ['os', 'das', 'dos', 'que', 'uma', 'com', 'para', 'não', 'seu', 'sua', 'ele', 'ela', 'em'],
+  fra: ['le', 'les', 'des', 'du', 'une', 'est', 'pour', 'dans', 'qui', 'sur', 'avec', 'et', 'au'],
+  deu: ['der', 'die', 'das', 'und', 'ist', 'ein', 'eine', 'mit', 'von', 'zu', 'den', 'sich', 'nicht'],
+  ita: ['il', 'gli', 'della', 'che', 'una', 'per', 'del', 'con', 'sono', 'nel', 'alla', 'di'],
+};
+/** Guess a schedule's language from common words; null when unsure. */
+export function guessLang(programmes) {
+  const words = programmes.slice(0, 40).map((p) => (p.t || '') + ' ' + (p.d || '')).join(' ').toLowerCase().match(/[a-zà-ÿ]+/g) || [];
+  if (words.length < 40) return null;
+  const score = {};
+  for (const [lang, list] of Object.entries(STOP)) {
+    const set = new Set(list);
+    score[lang] = words.filter((w) => set.has(w)).length / words.length;
+  }
+  const ranked = Object.entries(score).sort((a, b) => b[1] - a[1]);
+  const [best, top] = ranked[0];
+  const second = ranked[1][1];
+  return top >= 0.04 && top >= second * 1.8 ? best : null;
+}

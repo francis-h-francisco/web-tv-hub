@@ -1,0 +1,20 @@
+{
+  "appId": "io.github.francishfrancisco.webtvhub",
+  "appName": "Web TV Hub",
+  "webDir": "www",
+  "server": {
+    "url": "https://francis-h-francisco.github.io/web-tv-hub/",
+    "androidScheme": "https",
+    "allowNavigation": ["francis-h-francisco.github.io"]
+  },
+  "android": {
+    "backgroundColor": "#0b0d12",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_tv",
+      "iconColor": "#FFB347"
+    }
+  }
+}

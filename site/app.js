@@ -42,6 +42,7 @@
     interacted: false,
   };
   S.langs = (S.profile && S.profile.langs && S.profile.langs.length) ? S.profile.langs : ['eng'];
+  S.country = (S.profile && S.profile.country) || store.get('detectedCountry', null) || countryFromTimezone();
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
@@ -60,6 +61,28 @@
   const UA = navigator.userAgent;
   const NATIVE_RELIABLE = NATIVE_HLS && (/Android|iPhone|iPad|Web0S|webOS|Tizen|SMART-TV|AFT|CrKey/i.test(UA) ||
     (/Macintosh/.test(UA) && /Safari/.test(UA) && !/Chrome|Chromium|Edg|Firefox/.test(UA)));
+
+  // ---------------------------------------------------------------- location
+  // Which country the viewer is in decides which channels can actually play. Detected from the network
+  // (Cloudflare's public trace endpoint), with the device time zone as a fallback; changeable in the profile.
+  const TZ_COUNTRY = { 'Asia/Manila': 'PH', 'America/New_York': 'US', 'America/Chicago': 'US', 'America/Denver': 'US', 'America/Los_Angeles': 'US', 'America/Phoenix': 'US', 'America/Anchorage': 'US', 'Pacific/Honolulu': 'US',
+    'America/Toronto': 'CA', 'America/Vancouver': 'CA', 'Europe/London': 'GB', 'Europe/Dublin': 'IE', 'Europe/Berlin': 'DE', 'Europe/Paris': 'FR', 'Europe/Madrid': 'ES', 'Europe/Rome': 'IT', 'Europe/Amsterdam': 'NL',
+    'Europe/Stockholm': 'SE', 'Europe/Oslo': 'NO', 'Europe/Copenhagen': 'DK', 'Europe/Vienna': 'AT', 'Europe/Zurich': 'CH', 'Europe/Lisbon': 'PT', 'America/Sao_Paulo': 'BR', 'America/Mexico_City': 'MX',
+    'America/Argentina/Buenos_Aires': 'AR', 'America/Santiago': 'CL', 'Asia/Kolkata': 'IN', 'Asia/Calcutta': 'IN', 'Asia/Seoul': 'KR', 'Asia/Tokyo': 'JP', 'Asia/Singapore': 'SG', 'Asia/Kuala_Lumpur': 'MY',
+    'Asia/Jakarta': 'ID', 'Asia/Bangkok': 'TH', 'Asia/Ho_Chi_Minh': 'VN', 'Asia/Hong_Kong': 'HK', 'Asia/Dubai': 'AE', 'Australia/Sydney': 'AU', 'Australia/Melbourne': 'AU', 'Australia/Perth': 'AU', 'Pacific/Auckland': 'NZ' };
+  function countryFromTimezone() { try { return TZ_COUNTRY[Intl.DateTimeFormat().resolvedOptions().timeZone] || null; } catch (e) { return null; } }
+  const normCountry = (c) => (c === 'UK' ? 'GB' : c);
+  function countryName(cc) { try { return new Intl.DisplayNames(['en'], { type: 'region' }).of(cc); } catch (e) { return cc; } }
+  async function detectCountry() {
+    try {
+      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 4000);
+      const txt = await fetch('https://www.cloudflare.com/cdn-cgi/trace', { signal: ctrl.signal, cache: 'no-store' }).then((r) => r.text());
+      clearTimeout(t);
+      const m = /^loc=([A-Z]{2})$/m.exec(txt);
+      if (m && m[1] !== 'XX') { store.set('detectedCountry', m[1]); return m[1]; }
+    } catch (e) { /* offline or blocked: keep the time-zone guess */ }
+    return null;
+  }
 
   // ---------------------------------------------------------------- text matching (typo-tolerant)
   function fold(s) {
@@ -107,6 +130,8 @@
 
   // ---------------------------------------------------------------- boot
   async function boot() {
+    const rc = new URLSearchParams(location.search).get('remote');
+    if (rc !== null) { stopPlayback(); loadScript('remote.js').then(() => window.WTHRemote.controller(rc)); return; }
     tickClock(); setInterval(tickClock, 15000);
     try {
       const [c, w, p] = await Promise.all([
@@ -125,18 +150,24 @@
       $('#nowMeta').textContent = 'Check your connection and reload.';
       return;
     }
+    if (!(S.profile && S.profile.country)) { const cc = await detectCountry(); if (cc) S.country = cc; }
     await loadEpgFor(neededLangs());
     pruneExpired();
     renderTabs(); renderGuide();
     const want = new URLSearchParams(location.search).get('ch') || store.get('last', null);
     const wantCh = want && S.byId.get(want);
     const startCh = (wantCh && isVisible(wantCh)) ? wantCh : (forYou()[0] || bestStart());
-    if (startCh) play(startCh, { list: tabList() });
+    if (startCh) {
+      // open the guide on the channel's own category so what's playing is visible
+      if (!tabList().includes(startCh) && startCh.category !== 'byo') { S.tab = tabs().find((t) => t.list.includes(startCh)) ? tabs().find((t) => t.list.includes(startCh)).id : S.tab; renderTabs(); renderGuide(); }
+      play(startCh, { list: tabList() });
+    }
     setInterval(() => { renderTimeline(); refreshGuideTimes(); }, 30000);
     setInterval(checkReminders, 20000); checkReminders();
     setTimeout(announcePicks, 4000);
     if (!S.profile) setTimeout(openProfile, 700); else focusGuide();
     registerSW();
+    if (store.get('remotePaired', false) && !isMobile()) startRemoteHost();
   }
 
   // first-time start: a channel already confirmed working here, with a schedule, playable in the web player
@@ -145,13 +176,14 @@
     const v = visible().filter((c) => c.category !== 'news');
     return v.slice().sort((a, b) => score(b) - score(a))[0] || visible()[0];
   }
+  function loadScript(src) {
+    return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+  }
   function tickClock() { $('#clock').textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
 
   function neededLangs() {
     const s = new Set(S.langs.map(langKey));
     if (s.has('fil')) s.add('tgl');
-    // Philippine channels stay available when the viewer wants local channels
-    if (!S.profile || S.profile.ph !== false) S.all.filter((c) => c.country === 'PH').forEach((c) => s.add(c.lang));
     return [...s];
   }
   async function loadEpgFor(langs) {
@@ -165,13 +197,21 @@
   // ---------------------------------------------------------------- availability
   function playable(ch) { return plan(ch).length > 0; }
   function isUnavailable(ch) { const t = S.unavail[ch.id]; return !!t && t > Date.now(); }
+  // the language you actually hear: the channel's main audio track
   function langOk(ch) {
     if (ch.category === 'byo') return true;
-    if (ch.country === 'PH' && (!S.profile || S.profile.ph !== false)) return true;
-    const want = new Set(S.langs.map(langKey));
-    return (ch.languages && ch.languages.length ? ch.languages : [ch.lang]).some((l) => want.has(langKey(l)));
+    return S.langs.map(langKey).includes(langKey(ch.lang));
   }
-  function isVisible(ch) { return !isUnavailable(ch) && langOk(ch); }
+  // offered where the viewer is: FAST channels list their countries; region-locked streams play in their home country
+  function regionOk(ch) {
+    if (ch.category === 'byo' || !S.country) return true;
+    const cc = S.country;
+    if (ch.regions && !ch.regions.map(normCountry).includes(cc)) return false;
+    if (ch.streams && ch.streams.length && ch.streams.every((s) => s.geoBlocked) && normCountry(ch.country) !== cc) return false;
+    if (ch.news === 'local' && normCountry(ch.country) !== cc) return false; // local news: only your own country's
+    return true;
+  }
+  function isVisible(ch) { return !isUnavailable(ch) && langOk(ch) && regionOk(ch); }
   function visible() { return S.all.filter(isVisible); }
   function pruneExpired() {
     const now = Date.now(); let changed = false;
@@ -271,7 +311,14 @@
       }
     }
     const chans = visible().map((c) => ({ type: 'channel', label: c.name, key: fold(c.name), n: 1, id: c.id }));
-    suggestIndex = [...titles.values(), ...people.values(), ...chans];
+    // well-known stars even when nothing of theirs is on today
+    const stars = (S.stars || []).filter((n) => !people.has(fold(n))).map((n, i) => ({ type: 'person', label: n, key: fold(n), n: Math.max(0, 3 - i / 1000), titles: [] }));
+    suggestIndex = [...titles.values(), ...people.values(), ...chans, ...stars];
+  }
+  function loadStars() {
+    if (S.stars || S.starsLoading) return;
+    S.starsLoading = true;
+    fetch('data/stars.json').then((r) => r.json()).then((j) => { S.stars = j.names || []; suggestIndex = null; }).catch(() => { S.starsLoading = false; });
   }
   function suggest(q, limit) {
     if (!suggestIndex) buildSuggestIndex();
@@ -330,7 +377,6 @@
     if (pickChannels && pickChannels.has(ch.id)) s += pickChannels.get(ch.id);
     if (!P || P.skipped) return s;
     s += ((P.cats || {})[ch.category] || 0) * 3;
-    if (P.ph && ch.country === 'PH') s += 3;
     const txt = textOf(ch);
     for (const name of P.interests || []) for (const kw of INTERESTS[name] || []) if (txt.includes(kw)) { s += 2; break; }
     if ((P.eras || []).includes('classic') && /classic|retro|vintage|oldies/.test(txt)) s += 1.5;
@@ -368,11 +414,12 @@
     if (!t.find((x) => x.id === S.tab)) S.tab = t[0] ? t[0].id : null;
     const langLabel = S.langs.map((l) => langName(l)).slice(0, 2).join(', ') + (S.langs.length > 2 ? ' +' + (S.langs.length - 2) : '');
     $('#tabs').innerHTML = t.map((x) => '<button class="tab' + (x.id === S.tab ? ' on' : '') + '" role="tab" data-focus data-tab="' + x.id + '">' + esc(x.name) + '<small>' + x.list.length + '</small></button>').join('') +
-      '<button class="tab lang" data-focus data-action="langs">🌐 ' + esc(langLabel) + '</button>';
+      '<button class="tab lang" data-focus data-action="langs">🌐 ' + esc(langLabel) + '</button>' +
+      '<button class="tab lang" data-focus data-action="location">📍 ' + esc(S.country ? countryName(S.country) : 'Location') + '</button>';
   }
   function setTab(id, keepFocus) {
     if (S.tab === id) return;
-    S.tab = id; store.set('tab', id); renderTabs(); renderGuide();
+    S.tab = id; store.set('tab', id); renderTabs(); renderGuide(); notifyChange();
     $('#guide').scrollTop = 0;
     if (keepFocus) focusEl($('.tab[data-tab="' + cssEsc(id) + '"]'));
   }
@@ -389,7 +436,7 @@
       now = '<div class="r-now"><em>LIVE</em>' + esc(c.desc || '') + '</div>';
     }
     const next = nx ? '<div class="r-next"><em>NEXT ' + fmtTime(nx.s) + '</em><span>' + esc(nx.t) + '</span></div>' : '<div class="r-next"></div>';
-    const tags = (c.country === 'PH' ? '<span class="tag ph">PH</span>' : '') + (S.favs.has(c.id) ? '<span class="tag">★</span>' : '');
+    const tags = S.favs.has(c.id) ? '<span class="tag">★</span>' : '';
     return '<button class="row' + (playing ? ' playing' : '') + '" data-focus data-ch="' + esc(c.id) + '">' +
       '<div class="r-logo">' + (c.logo ? '<img loading="lazy" alt="" src="' + esc(c.logo) + '" data-i="' + initials + '">' : '<span>' + initials + '</span>') + '</div>' +
       '<div class="r-main"><div class="r-name"><b>' + esc(c.name) + '</b>' + tags + (playing ? '<span class="r-watching">▶ WATCHING</span>' : '') + '</div>' + now + '</div>' + next + '</button>';
@@ -453,10 +500,11 @@
     opts = opts || {};
     S.current = ch; S.userPick = !!opts.user;
     if (opts.list && opts.list.length) S.list = opts.list;
-    if (!S.list.includes(ch)) S.list = tabList().includes(ch) ? tabList() : [ch];
+    if (!S.list.includes(ch)) S.list = tabList().includes(ch) ? tabList() : visible().filter((c) => c.category === ch.category);
+    if (!S.list.includes(ch)) S.list = [ch].concat(S.list);
     if (ch.category !== 'byo') store.set('last', ch.id);
     S.attempts = plan(ch, true); S.attempt = 0;
-    renderNow(); renderTimeline(); refreshGuideTimes(); osd();
+    renderNow(); renderTimeline(); refreshGuideTimes(); osd(); notifyChange();
     if (!S.attempts.length) { failChannel("This channel can't play in this browser."); return; }
     tryAttempt();
   }
@@ -516,7 +564,7 @@
   }
   function setMsg(t) { $('#playerMsg').textContent = t || ''; }
   function unmuteOnce() {
-    if (S.interacted) return; S.interacted = true;
+    if (S.interacted || remoteMode()) return; S.interacted = true;
     video.muted = false; $('#unmute').hidden = true;
     const p = video.play(); if (p && p.catch) p.catch(() => {});
   }
@@ -529,7 +577,6 @@
     const cat = S.categories.find((c) => c.id === ch.category);
     const bits = [cat ? cat.name : 'My playlist'];
     if (ch.lang && LANG_NAMES[ch.lang]) bits.push(langName(ch.lang));
-    if (ch.country === 'PH') bits.push('Philippines');
     $('#nowMeta').innerHTML = esc(bits.join(' · ')) + (ch.labels || []).filter((t) => !cat || t !== cat.name).slice(0, 4).map((t) => ' <span class="tag">' + esc(t) + '</span>').join('') +
       (ch.desc ? '<div class="ch-desc">' + esc(ch.desc) + '</div>' : '');
     const logo = $('#nowLogo');
@@ -568,15 +615,32 @@
 
   // ---------------------------------------------------------------- reminders (while the app is open)
   const OFFSETS = [24 * 3600e3, 3600e3, 15 * 60e3, 0];
+  // In the Android app, reminders are real phone notifications that fire even when the app is closed.
+  const nativeNotes = () => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) || null;
+  const noteId = (chId, s, o) => { let h = 7; for (const ch of chId + s + o) h = (h * 31 + ch.charCodeAt(0)) | 0; return Math.abs(h) % 2000000000; };
+  async function scheduleNative(r, cancel) {
+    const LN = nativeNotes(); if (!LN) return;
+    const ids = [3600e3, 15 * 60e3, 0].map((o) => ({ id: noteId(r.ch, r.s, o), o }));
+    try {
+      await LN.cancel({ notifications: ids.map((x) => ({ id: x.id })) });
+      if (cancel) return;
+      const perm = await LN.requestPermissions(); if (perm.display !== 'granted') return;
+      await LN.schedule({ notifications: ids.filter((x) => r.s - x.o > Date.now()).map((x) => ({
+        id: x.id, title: x.o ? r.t + ' starts in ' + mins(x.o) + ' min' : r.t + ' is starting now',
+        body: 'On ' + r.name + ' · ' + fmtTime(r.s), schedule: { at: new Date(r.s - x.o), allowWhileIdle: true }, extra: { ch: r.ch },
+      })) });
+    } catch (e) { /* plugin unavailable */ }
+  }
   function hasReminder(chId, s) { return S.reminders.some((r) => r.ch === chId && r.s === s); }
   function toggleReminder(ch, s) {
     const p = progs(ch).find((x) => x.s === s); if (!p) return;
-    if (hasReminder(ch.id, s)) { S.reminders = S.reminders.filter((r) => !(r.ch === ch.id && r.s === s)); toast('Reminder removed.', null, 2500); }
+    if (hasReminder(ch.id, s)) { S.reminders.filter((r) => r.ch === ch.id && r.s === s).forEach((r) => scheduleNative(r, true)); S.reminders = S.reminders.filter((r) => !(r.ch === ch.id && r.s === s)); toast('Reminder removed.', null, 2500); }
     else {
       S.reminders = S.reminders.filter((r) => r.s > Date.now() - 3600e3);
       if (S.reminders.length >= FREE_REMINDERS) { toast('You can keep up to ' + FREE_REMINDERS + ' reminders. Remove one in My TV to add another.'); return; }
-      S.reminders.push({ ch: ch.id, name: ch.name, s: p.s, t: p.t, fired: OFFSETS.filter((o) => Date.now() >= p.s - o).map(String) });
-      toast("We'll remind you about <b>" + esc(p.t) + '</b> at ' + fmtTime(p.s) + ' (also 1 hour and 15 minutes before) while this app is open.');
+      const rem = { ch: ch.id, name: ch.name, s: p.s, t: p.t, fired: OFFSETS.filter((o) => Date.now() >= p.s - o).map(String) };
+      S.reminders.push(rem); scheduleNative(rem);
+      toast("We'll remind you about <b>" + esc(p.t) + '</b> at ' + fmtTime(p.s) + ' (also 1 hour and 15 minutes before)' + (nativeNotes() ? ', even when the app is closed.' : ' while this site is open. Get the Android app for notifications when it\'s closed.'));
       if (window.Notification && Notification.permission === 'default') { try { Notification.requestPermission(); } catch (e) { /* unsupported */ } }
     }
     store.set('reminders', S.reminders); renderTimeline();
@@ -634,6 +698,8 @@
   let overlayClose = null;
   function openOverlay(html, onClose) {
     if ($('#overlay').hidden) pushBack();
+    const m = /^<h2>([\s\S]*?)<\/h2>/.exec(html);
+    if (m) html = '<div class="panel-head"><h2>' + m[1] + '</h2><button class="closex" data-focus data-close aria-label="Close">✕</button></div>' + html.slice(m[0].length);
     $('#panel').innerHTML = html; $('#overlay').hidden = false; overlayClose = onClose || null;
     $$('#panel img').forEach(imgFallback);
     $$('#panel [data-close]').forEach((b) => b.addEventListener('click', closeOverlay));
@@ -641,6 +707,7 @@
     // TV/desktop: put the remote's focus inside the dialog. Phones: no focus jump, no surprise keyboard.
     if (!isMobile()) setTimeout(() => focusEl($('#panel [data-autofocus]') || $('#panel [data-focus]')), 30);
   }
+  $('#overlay').addEventListener('click', (e) => { if (e.target.id === 'overlay') closeOverlay(); });
   function closeOverlay() {
     if ($('#overlay').hidden) return;
     $('#overlay').hidden = true; $('#panel').innerHTML = '';
@@ -649,15 +716,16 @@
   }
   function setBottom(a) { $$('.bottombar button').forEach((b) => b.classList.toggle('on', b.dataset.action === a)); }
   function langCounts() {
-    const counts = {}; S.all.forEach((c) => { const k = langKey(c.lang); counts[k] = (counts[k] || 0) + 1; });
+    // count only channels you could actually watch where you are
+    const counts = {}; S.all.filter((c) => regionOk(c) && !isUnavailable(c)).forEach((c) => { const k = langKey(c.lang); counts[k] = (counts[k] || 0) + 1; });
     const langs = Object.keys(counts).filter((k) => LANG_NAMES[k]).sort((a, b) => (a === 'eng' ? -1 : b === 'eng' ? 1 : counts[b] - counts[a]));
     return { counts, langs };
   }
 
   // Profile: languages, favorite shows/movies/stars, kinds of TV
   function openProfile() {
-    setBottom('profile');
-    const P = (S.profile && !S.profile.skipped) ? S.profile : { cats: {}, interests: [], eras: [], ph: true, langs: S.langs, picks: [] };
+    setBottom('profile'); loadStars();
+    const P = (S.profile && !S.profile.skipped) ? S.profile : { cats: {}, interests: [], eras: [], langs: S.langs, picks: [] };
     const draft = { picks: (P.picks || []).slice() };
     const { counts, langs } = langCounts();
     const chip = (group, val, label, on) => '<button class="chip' + (on ? ' on' : '') + '" data-focus data-group="' + group + '" data-val="' + esc(val) + '">' + esc(label) + '</button>';
@@ -666,7 +734,8 @@
       '<p>A few quick picks so the right channels come first. Everything here stays on this device. You can skip this.</p>' +
       '<h3>Favorite shows, movies or stars</h3><p class="small">Type a title or a name. Spelling doesn\'t have to be perfect. We\'ll show you when they\'re on.</p>' +
       '<input class="field" id="pickIn" data-focus placeholder="e.g. Frasier, Star Trek, Lucille Ball" autocomplete="off" autocapitalize="off" spellcheck="false"><div class="suggest" id="pickSug"></div><div class="chips" id="pickChips" style="margin-top:.6rem"></div>' +
-      '<h3>Languages</h3><div class="chips">' + langs.map((l) => chip('lang', l, langName(l) + ' (' + counts[l] + ')', (P.langs || ['eng']).map(langKey).includes(l))).join('') + chip('ph', 'ph', '🇵🇭 Always show Philippine channels', P.ph !== false) + '</div>' +
+      '<h3>Languages</h3><div class="chips">' + langs.map((l) => chip('lang', l, langName(l) + ' (' + counts[l] + ')', (P.langs || ['eng']).map(langKey).includes(l))).join('') + '</div>' +
+      '<p class="small" style="margin-top:.8rem">📍 Showing channels available in <b>' + esc(S.country ? countryName(S.country) : 'your country') + '</b>. <a href="#" data-goloc>Change</a></p>' +
       '<h3>Kinds of TV you like</h3><div class="chips">' + S.categories.map((c) => chip('cat', c.id, c.name, ((P.cats || {})[c.id] || 0) > 0)).join('') + '</div>' +
       '<details class="more-prefs"' + ((P.interests || []).length || (P.eras || []).length ? ' open' : '') + '><summary data-focus tabindex="0">More preferences (optional)</summary>' +
       '<h3>Topics</h3><div class="chips">' + Object.keys(INTERESTS).map((k) => chip('int', k, k, (P.interests || []).includes(k))).join('') + '</div>' +
@@ -686,7 +755,7 @@
       if (!draft.picks.some((x) => x.type === p.type && x.key === p.key)) draft.picks.push(p);
       input.value = ''; sug.innerHTML = ''; renderPicks(); focusEl(input);
     };
-    const typeLabel = (e) => e.type === 'person' ? 'Star · in ' + e.titles.length + ' show' + (e.titles.length > 1 ? 's' : '') + ' on the schedule' : e.type === 'channel' ? 'Channel' : (e.kind === 'movie' ? 'Movie' : 'Show') + ' · on the schedule';
+    const typeLabel = (e) => e.type === 'person' ? (e.titles.length ? 'Star · in ' + e.titles.length + ' show' + (e.titles.length > 1 ? 's' : '') + ' on the schedule' : 'Star · we\'ll tell you when they\'re on') : e.type === 'channel' ? 'Channel' : (e.kind === 'movie' ? 'Movie' : 'Show') + ' · on the schedule';
     const showSug = () => {
       const q = input.value.trim(); const res = suggest(q, 6);
       sug.innerHTML = res.map((r, i) => '<button class="sug" data-focus data-si="' + i + '"><span>' + esc(r.e.label) + '</span><small>' + typeLabel(r.e) + '</small></button>').join('') +
@@ -702,13 +771,14 @@
       addPick(res[0] && res[0].s >= 0.75 ? res[0].e : null, q); // auto-correct obvious typos
     });
     renderPicks();
+    const gl = $('#panel [data-goloc]'); if (gl) gl.addEventListener('click', (e) => { e.preventDefault(); openLocation(); });
     const skip = $('[data-ob="skip"]'); if (skip) skip.onclick = () => { S.profile = { skipped: true, cats: {}, langs: ['eng'] }; store.set('profile', S.profile); closeOverlay(); };
     $('[data-ob="save"]').onclick = async () => {
       const on = (g) => $$('#panel .chip.on[data-group="' + g + '"]').map((b) => b.dataset.val);
       const cats = {}; on('cat').forEach((id) => { cats[id] = 1; });
       const langsSel = on('lang'); const pending = input.value.trim();
       if (pending.length >= 2) { const r = suggest(pending, 1); addPick(r[0] && r[0].s >= 0.75 ? r[0].e : null, pending); }
-      S.profile = { cats, interests: on('int'), eras: on('era'), ph: on('ph').length > 0, langs: langsSel.length ? langsSel : ['eng'], picks: draft.picks, skipped: false, updated: Date.now() };
+      S.profile = { cats, interests: on('int'), eras: on('era'), langs: langsSel.length ? langsSel : ['eng'], picks: draft.picks, skipped: false, updated: Date.now(), country: (S.profile && S.profile.country) || undefined };
       store.set('profile', S.profile);
       closeOverlay(); await applyLangs(S.profile.langs);
       if (forYou().length) { S.tab = 'foryou'; store.set('tab', 'foryou'); }
@@ -738,6 +808,26 @@
     };
   }
 
+  function openLocation() {
+    const set = new Set(['PH', 'US', 'GB', 'CA', 'AU', 'NZ', 'IE', 'IN', 'SG', 'MY', 'DE', 'FR', 'ES', 'IT', 'NL', 'SE', 'NO', 'DK', 'BR', 'MX', 'AR', 'CL', 'KR', 'JP']);
+    S.all.forEach((c) => { if (c.country && /^[A-Z]{2}$/.test(c.country)) set.add(normCountry(c.country)); (c.regions || []).forEach((r) => set.add(r)); });
+    const list = [...set].map((cc) => ({ cc, name: countryName(cc) })).sort((x, y) => x.name.localeCompare(y.name));
+    const auto = !(S.profile && S.profile.country);
+    openOverlay('<h2>Your location</h2><p>Many channels are only offered in certain countries. We show the ones that can play where you are.' +
+      (auto ? ' Detected automatically: <b>' + esc(S.country ? countryName(S.country) : 'unknown') + '</b>.' : '') + '</p>' +
+      '<div class="chips"><button class="chip' + (auto ? ' on' : '') + '" data-focus data-cc="">📡 Detect automatically</button>' +
+      list.map((x) => '<button class="chip' + (!auto && S.country === x.cc ? ' on' : '') + '" data-focus data-cc="' + x.cc + '">' + esc(x.name) + '</button>').join('') + '</div>');
+    $$('#panel [data-cc]').forEach((b) => b.addEventListener('click', async () => {
+      const cc = b.dataset.cc;
+      S.profile = S.profile || { skipped: true, cats: {}, langs: S.langs };
+      if (cc) { S.profile.country = cc; S.country = cc; } else { delete S.profile.country; S.country = (await detectCountry()) || countryFromTimezone(); }
+      store.set('profile', S.profile); suggestIndex = null;
+      closeOverlay(); renderTabs(); renderGuide();
+      if (S.current && !isVisible(S.current)) { const c = bestStart(); if (c) play(c, { list: tabList() }); }
+      toast('Showing channels available in <b>' + esc(countryName(S.country)) + '</b>.', null, 3000, 'loc');
+    }));
+  }
+
   // My TV: picks on air, reminders, favorites
   function openMyTv() {
     setBottom('mytv');
@@ -762,6 +852,7 @@
     const rem = S.reminders.filter((r) => r.s > Date.now() - 30 * 60e3);
     const favs = visible().filter((c) => S.favs.has(c.id));
     openOverlay('<h2>My TV</h2>' +
+      (isMobile() ? '<button class="btn primary" style="width:100%;margin-bottom:.4rem" data-focus data-action="remote">📱 Use this phone as a TV remote</button>' : '') +
       '<h3>Your picks on air (next 24 hours)</h3>' +
       (picks().length ? (onAir.length ? '<div class="list">' + onAir.map(li).join('') + '</div>' : '<p>None of your picks are on free TV in the next 24 hours.</p>') :
         '<p>Add favorite shows, movies or stars in your profile and we\'ll list when they\'re on.</p><button class="btn small" data-focus data-goprofile>Open profile</button>') +
@@ -779,13 +870,13 @@
       if (s && s > Date.now()) { toggleReminder(c, s); openMyTv(); return; }
       closeOverlay(); play(c, { list: tabList(), user: true });
     }));
-    $$('#panel [data-unrem]').forEach((b) => b.addEventListener('click', () => { const [ch, s] = b.dataset.unrem.split('|'); S.reminders = S.reminders.filter((r) => !(r.ch === ch && r.s === +s)); store.set('reminders', S.reminders); renderTimeline(); openMyTv(); }));
+    $$('#panel [data-unrem]').forEach((b) => b.addEventListener('click', () => { const [ch, s] = b.dataset.unrem.split('|'); S.reminders.filter((r) => r.ch === ch && r.s === +s).forEach((r) => scheduleNative(r, true)); S.reminders = S.reminders.filter((r) => !(r.ch === ch && r.s === +s)); store.set('reminders', S.reminders); renderTimeline(); openMyTv(); }));
     const gp = $('#panel [data-goprofile]'); if (gp) gp.addEventListener('click', () => openProfile());
   }
 
   // Search with typo tolerance + "where to watch" for things that aren't on free TV
   function openSearch() {
-    setBottom('search');
+    setBottom('search'); loadStars();
     openOverlay('<h2>Search</h2><p>Channels, shows, movies and stars. Typos are OK.</p><input class="field" id="q" data-focus data-autofocus placeholder="Try: frasier, star trek, cartoons, NBA" autocomplete="off" autocapitalize="off" spellcheck="false"><div id="sr" class="results"></div>' +
       '<div class="panel-actions"><button class="btn" data-focus data-close>Close</button></div>');
     const q = $('#q'); let t = null;
@@ -835,6 +926,7 @@
     const url = location.origin + location.pathname;
     openOverlay('<h2>More</h2>' +
       '<h3>Open on another screen</h3><div style="display:flex;gap:1.4rem;align-items:center;flex-wrap:wrap"><div class="qr" id="qr"></div><div style="flex:1;min-width:14rem"><p>Scan with your phone camera, or type this address into your TV\'s browser (TV Bro, BrowseHere, Silk):</p><div class="bigurl">' + esc(url.replace(/^https:\/\//, '')) + '</div><p class="small">On a TV stick, bookmark it so it\'s one click next time.</p></div></div>' +
+      '<h3>Android app</h3><p>Same TV, plus reminders that pop up even when the app is closed, and works as a remote for your TV.</p><a class="btn primary" data-focus href="download.html">Get the Android app</a>' +
       '<h3>Install as an app</h3><p>' + (installPrompt ? 'Add Web TV Hub to your home screen. It opens full screen like a regular app.' : 'On a phone, open your browser\'s menu and choose “Add to Home screen”. It opens full screen like a regular app.') + '</p>' + (installPrompt ? '<button class="btn primary" data-focus data-install>Install app</button>' : '') +
       '<h3>My playlist</h3><p>Add one .m3u playlist link of your own. It\'s saved only in this browser and never sent to us. Links must start with https:// and the server must allow web players.</p>' +
       '<input class="field" id="m3u" data-focus placeholder="https://example.com/my-playlist.m3u" value="' + esc(S.byo ? S.byo.url : '') + '"><p class="small" id="m3uMsg">' + (S.byo ? S.byo.channels.length + ' channels loaded.' : '') + '</p>' +
@@ -883,7 +975,9 @@
   }
 
   // ---------------------------------------------------------------- clicks
+  const remoteMode = () => document.body.classList.contains('remote-mode');
   document.addEventListener('click', (e) => {
+    if (remoteMode()) return;
     const row = e.target.closest('.row[data-ch]');
     if (row) {
       const c = S.byId.get(row.dataset.ch); if (!c) return;
@@ -900,6 +994,8 @@
     else if (a === 'profile') openProfile();
     else if (a === 'more') openMore();
     else if (a === 'langs') openLangs();
+    else if (a === 'location') openLocation();
+    else if (a === 'remote') openRemote();
     else if (a === 'home') { closeOverlay(); setBottom('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
     else if (a === 'fullscreen') enterFs();
     else if (a === 'fav' && S.current) {
@@ -909,6 +1005,7 @@
     }
   });
   document.addEventListener('focusin', (e) => {
+    if (remoteMode()) return;
     const el = e.target; if (!el.hasAttribute || !el.hasAttribute('data-focus')) return;
     $$('.focused').forEach((x) => x !== el && x.classList.remove('focused')); el.classList.add('focused');
     if (el.dataset.ch) renderPeek(S.byId.get(el.dataset.ch));
@@ -971,6 +1068,7 @@
   $('#player').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !document.body.classList.contains('fs')) { e.preventDefault(); if (!S.interacted) unmuteOnce(); enterFs(); } });
   const BACK_KEYS = new Set(['Escape', 'GoBack', 'BrowserBack', 'Back']);
   document.addEventListener('keydown', (e) => {
+    if (remoteMode()) return;
     const k = e.key, code = e.keyCode;
     const inField = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA');
     if (!S.interacted && !inField) unmuteOnce();
@@ -990,7 +1088,76 @@
   });
   document.addEventListener('pointerdown', () => { if (!S.interacted) unmuteOnce(); }, { once: true });
 
+  // ---------------------------------------------------------------- phone remote (TV side)
+  const changeListeners = new Set();
+  function notifyChange() { changeListeners.forEach((f) => { try { f(); } catch (e) { /* ignore */ } }); }
+  function remoteState() {
+    const c = S.current; const np = nowProg(c), nx = nextProg(c);
+    return {
+      ch: c ? { id: c.id, name: c.name, logo: c.logo || null } : null,
+      now: np ? { t: np.t, s: np.s, e: np.e } : null, next: nx ? { t: nx.t, s: nx.s } : null,
+      tab: S.tab, tabs: tabs().map((t) => ({ id: t.id, name: t.name })),
+      list: tabList().slice(0, 80).map((x) => { const p = nowProg(x); return { id: x.id, name: x.name, now: p ? p.t : '' }; }),
+      muted: video.muted, vol: video.volume,
+    };
+  }
+  function remoteKey(k) {
+    const fs = document.body.classList.contains('fs');
+    if (k === 'up' || k === 'down' || k === 'left' || k === 'right') {
+      if (fs && $('#overlay').hidden) { if (k === 'up') zap(-1); else if (k === 'down') zap(1); else osd(); return; }
+      move(k); return;
+    }
+    if (k === 'ok') {
+      if (fs) { osd(); return; }
+      const ae = document.activeElement;
+      if (ae && ae.id === 'player') { enterFs(); return; }
+      if (ae && ae !== document.body && ae.click) ae.click(); else focusGuide();
+      return;
+    }
+    if (k === 'back') { back(); return; }
+    if (k === 'chup') { zap(-1); return; }
+    if (k === 'chdown') { zap(1); return; }
+    if (k === 'fs') { if (fs) exitFs(); else enterFs(); return; }
+    if (k === 'volup' || k === 'voldown') { video.volume = Math.max(0, Math.min(1, video.volume + (k === 'volup' ? 0.1 : -0.1))); unmuteFromRemote(); toast('🔊 ' + Math.round(video.volume * 100) + '%', null, 1200, 'vol'); return; }
+    if (k === 'mute') { if (video.muted) unmuteFromRemote(); else { video.muted = true; toast('🔇 Muted', null, 1200, 'vol'); } }
+  }
+  function unmuteFromRemote() {
+    if (!video.muted) return;
+    video.muted = false; S.interacted = true; $('#unmute').hidden = true;
+    const p = video.play();
+    if (p && p.catch) p.catch(() => { video.muted = true; video.play().catch(() => {}); toast('To allow sound, press any button on the TV remote (or click the TV screen) once.', null, 6000, 'vol'); });
+  }
+  window.WTH = {
+    state: remoteState, key: remoteKey, onChange: (f) => changeListeners.add(f),
+    play: (id) => { const c = S.byId.get(id); if (c) play(c, { list: tabList(), user: true }); },
+    setTab: (id) => setTab(id), toast: (m) => toast(esc(m), null, 3500, 'remote'),
+  };
+  async function startRemoteHost() {
+    if (!window.WTHRemote) await loadScript('remote.js');
+    return window.WTHRemote.startHost(window.WTH);
+  }
+  async function openRemote() {
+    if (isMobile()) { location.href = location.pathname + '?remote='; return; } // phone: become the remote
+    openOverlay('<h2>Phone remote</h2><p>Control this TV from your phone. No account or app needed.</p>' +
+      '<div style="display:flex;gap:1.6rem;align-items:center;flex-wrap:wrap"><div class="qr" id="qr"></div><div style="flex:1;min-width:16rem">' +
+      '<p>1. Open your phone camera and scan the code.<br>2. Or on your phone open <b>' + esc((location.host + location.pathname).replace(/\/$/, '')) + '</b> → My TV → Use as remote, and type:</p>' +
+      '<div class="bigcode" id="rcCode">······</div><p class="small" id="rcStatus">Starting…</p>' +
+      '<button class="btn small" data-focus id="rcNew">New code</button></div></div>');
+    store.set('remotePaired', true);
+    try {
+      const h = await startRemoteHost();
+      const show = () => {
+        const code = window.WTHRemote.host.code; const el = $('#rcCode'); if (!el) return;
+        el.textContent = code; drawQr(location.origin + location.pathname + '?remote=' + code);
+        const st = $('#rcStatus'); if (st) st.textContent = { starting: 'Starting…', waiting: 'Waiting for your phone…', connected: '✅ Phone connected', error: 'Remote service unavailable right now. Try “New code”.' }[h.status] || '';
+      };
+      h.listeners.add(show); show();
+      $('#rcNew').onclick = async () => { await window.WTHRemote.newHostCode(window.WTH); show(); };
+    } catch (e) { const st = $('#rcStatus'); if (st) st.textContent = 'Remote unavailable: ' + e.message; }
+  }
+
   // ---------------------------------------------------------------- installable app (offline shell)
+  if (nativeNotes()) { try { nativeNotes().addListener('localNotificationActionPerformed', (ev) => { const id = ev && ev.notification && ev.notification.extra && ev.notification.extra.ch; const c = id && S.byId.get(id); if (c) play(c, { list: tabList(), user: true }); }); } catch (e) { /* ignore */ } }
   function registerSW() {
     if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
   }

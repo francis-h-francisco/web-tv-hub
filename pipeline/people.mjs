@@ -124,3 +124,44 @@ async function query(labels) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Directory of well-known actors, comedians and presenters for profile suggestions, so people can pick
+// a favourite star even when nothing of theirs is on today ("we'll tell you when they're on").
+const DIRECTORY_DAYS = 30;
+export async function buildDirectory({ cachePath, minSitelinks = 40, limit = 8000 }, log) {
+  try {
+    const c = JSON.parse(await readFile(cachePath, 'utf8'));
+    if (Date.now() - c.at < DIRECTORY_DAYS * 86400e3 && c.names.length) { log(`directory: ${c.names.length} names (cached)`); return c.names; }
+  } catch { /* first run */ }
+  // one query per occupation: a combined query times out on the public endpoint
+  const OCC = ['Q33999', 'Q10800557', 'Q10798782', 'Q2405480', 'Q245068', 'Q947873'];
+  try {
+    const all = new Map();
+    for (const occ of OCC) {
+      const sparql = `SELECT ?name ?links WHERE {
+  ?p wdt:P106 wd:${occ} ; wikibase:sitelinks ?links .
+  FILTER(?links >= ${minSitelinks})
+  ?p rdfs:label ?name FILTER(LANG(?name) = "en")
+} ORDER BY DESC(?links) LIMIT ${limit}`;
+      try {
+        const r = await fetch(ENDPOINT + '?query=' + encodeURIComponent(sparql), { headers: { Accept: 'application/sparql-results+json', 'User-Agent': UA }, signal: AbortSignal.timeout(90000) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        for (const b of j.results.bindings) {
+          const n = b.name.value, l = parseInt(b.links.value, 10);
+          if (!/^Q\d+$/.test(n) && (all.get(n) || 0) < l) all.set(n, l);
+        }
+      } catch (e) { log(`directory ${occ}: ${e.message}`); }
+      await sleep(1500);
+    }
+    if (!all.size) throw new Error('no results');
+    const names = [...all.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map((x) => x[0]);
+    await mkdir(dirname(cachePath), { recursive: true });
+    await writeFile(cachePath, JSON.stringify({ at: Date.now(), names }));
+    log(`directory: ${names.length} names`);
+    return names;
+  } catch (e) {
+    log(`directory failed: ${e.message}`);
+    try { return JSON.parse(await readFile(cachePath, 'utf8')).names; } catch { return []; }
+  }
+}

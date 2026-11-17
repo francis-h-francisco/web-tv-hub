@@ -21,9 +21,7 @@
     "vie",
     "tha"
   ],
-  "alwaysIncludeCountries": [
-    "PH"
-  ],
+  "alwaysIncludeCountries": [],
   "excludeCategories": [
     "religious",
     "xxx",
@@ -85,7 +83,6 @@
       "DW.de"
     ],
     "internationalMax": 2,
-    "localCountry": "PH",
     "localMax": 3,
     "localPreferred": [
       "PTV4.ph",
@@ -93,7 +90,8 @@
       "AbanteTV.ph",
       "BilyonaryoNewsChannel.ph",
       "CLTV36.ph"
-    ]
+    ],
+    "_doc": "International channels are shown to everyone; up to localMax local news channels per country are shown to viewers in that country."
   },
   "extraChannels": {
     "_doc": "Channels outside the 6 source categories to force into a category, e.g. CLTV36 (general) into news.",

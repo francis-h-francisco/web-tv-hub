@@ -2,10 +2,11 @@
 // 6-hourly refresh: iptv-org -> curate -> health-check (playlist + variant + segment) -> guides -> cast -> site/data
 // Usage: node pipeline/build.mjs [--out site/data] [--limit N] [--skip-health] [--skip-epg] [--skip-people]
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { curate, applyCaps, describeChannel, primaryLang } from './lib.mjs';
+import { curate, applyCaps, describeChannel, primaryLang, guessLang } from './lib.mjs';
+import { loadRegions, channelRegions } from './regions.mjs';
 import { makeChecker } from './health.mjs';
 import { buildEpg } from './epg.mjs';
-import { buildPeople } from './people.mjs';
+import { buildPeople, buildDirectory } from './people.mjs';
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
@@ -59,8 +60,24 @@ if (!flag('--skip-health')) {
 const final = applyCaps(candidates, config);
 log(`after caps: ${final.length} channels`);
 
-let epg = {}, via = {}, meta = {};
-if (!flag('--skip-epg')) ({ epg, via, meta } = await buildEpg(final, config.epg, log));
+let epg = {}, via = {}, meta = {}, how = {};
+if (!flag('--skip-epg')) ({ epg, via, meta, how } = await buildEpg(final, config.epg, log));
+
+// Language check against what the schedule is actually written in.
+// Exact stream match: trust the schedule and relabel the channel. Name match: the listing is probably
+// for a different-language version of the channel, so drop the schedule instead.
+const langFix = { relabeled: 0, droppedGuides: 0 };
+for (const c of final) {
+  if (!epg[c.id]) continue;
+  const g = guessLang(epg[c.id]);
+  const lang = primaryLang(c);
+  if (!g || g === lang || !['eng', 'spa', 'por', 'fra', 'deu', 'ita'].includes(lang)) continue;
+  if (how[c.id] === 'id') { c.streams.forEach((s) => { s.lang = g; }); c.languages = [g]; langFix.relabeled++; }
+  else { delete epg[c.id]; delete via[c.id]; delete meta[c.id]; langFix.droppedGuides++; }
+}
+log('language check', JSON.stringify(langFix));
+
+const regionMap = flag('--skip-epg') ? new Map() : await loadRegions(log);
 log(`epg: ${Object.keys(epg).length}/${final.length} channels with a guide`);
 
 let people = {};
@@ -68,13 +85,18 @@ if (!flag('--skip-epg') && !flag('--skip-people') && config.people?.enabled) {
   people = await buildPeople(epg, { cachePath: new URL('../.cache/people.json', import.meta.url).pathname, ...config.people }, log);
 }
 
+let stars = [];
+if (!flag('--skip-people') && config.people?.enabled) {
+  stars = await buildDirectory({ cachePath: new URL('../.cache/directory.json', import.meta.url).pathname }, log);
+}
+
 const generated = new Date().toISOString();
 const categories = config.categoryMap.map(({ id, name }) => ({ id, name }));
 const outChannels = final.map((c) => {
   const { desc, tags } = describeChannel(c, epg[c.id], meta[c.id]);
   const { tags: _src, ...rest } = c;
-  const lang = primaryLang(c, config);
-  return { ...rest, lang, desc, labels: tags, hasEpg: !!epg[c.id], guide: via[c.id] || null };
+  const lang = primaryLang(c);
+  return { ...rest, lang, desc, labels: tags, hasEpg: !!epg[c.id], guide: via[c.id] || null, regions: channelRegions(c, regionMap) };
 });
 await mkdir(OUT, { recursive: true });
 await writeFile(`${OUT}/channels.json`, JSON.stringify({ generated, categories, channels: outChannels }));
@@ -85,8 +107,9 @@ for (const c of outChannels) if (epg[c.id]) (epgByLang[c.lang] ||= {})[c.id] = e
 for (const [lang, part] of Object.entries(epgByLang)) await writeFile(`${OUT}/epg/${lang}.json`, JSON.stringify({ generated, epg: part }));
 await writeFile(`${OUT}/people.json`, JSON.stringify({ generated, cast: people }));
 await writeFile(`${OUT}/where-to-watch.json`, JSON.stringify(config.whereToWatch));
+await writeFile(`${OUT}/stars.json`, JSON.stringify({ generated, names: stars }));
 const byCat = Object.fromEntries(categories.map((c) => [c.name, outChannels.filter((x) => x.category === c.id).length]));
 const guides = {};
 for (const v of Object.values(via)) guides[v] = (guides[v] || 0) + 1;
-await writeFile(`${OUT}/report.json`, JSON.stringify({ generated, excluded: stats.excluded, health, byCategory: byCat, epgChannels: Object.keys(epg).length, guides, castTitles: Object.keys(people).length }, null, 2));
+await writeFile(`${OUT}/report.json`, JSON.stringify({ generated, excluded: stats.excluded, health, byCategory: byCat, epgChannels: Object.keys(epg).length, guides, castTitles: Object.keys(people).length, langFix, regionKnown: outChannels.filter((c) => c.regions).length }, null, 2));
 log('done', JSON.stringify(byCat));

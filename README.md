@@ -27,6 +27,9 @@ GitHub Actions (every 6 h)                         Browser (TV stick, phone, lap
   - **Profile:** languages (English by default), favorite shows, movies and stars with typo-tolerant autosuggest ("fraiser" finds Frasier), kinds of TV, topics and era. **My TV** lists when your picks are on, plus reminders and favorites.
   - **App features:** installable as an app with an offline shell, and a QR code to open the site on another screen. Captions are off because most channels don't provide reliable ones.
   - **Privacy:** profile, favorites, reminders and the personal playlist are stored in `localStorage` only.
+- **Location-aware:** channels not offered in the viewer's country are hidden, based on platform country lists, region-lock labels and local news. See playbook 8c.
+- **Phone remote:** Remote on the TV shows a QR code and code; the phone becomes a remote over a direct WebRTC link (`site/remote.js`, PeerJS).
+- **`app/`**: Android app (Capacitor shell with native reminders). Built, ClamAV-scanned and released by `.github/workflows/android.yml`; download page `site/download.html`.
 - **`config/curation.json`**: everything a curator changes, including stream hosts, news channels, categories, languages, guide sources and "where to watch" links.
 
 ## Run locally
