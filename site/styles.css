@@ -290,3 +290,33 @@ body.remote-mode { padding: 0; }
   .watch { gap: .75rem; }
   .ch-desc { -webkit-line-clamp: 1; }
 }
+
+/* ---------- safe areas: notches, punch-hole cameras, status bars, gesture bars ----------
+   The Android app (Capacitor 8 SystemBars) injects --safe-area-inset-*, which is correct even on older
+   Android WebViews; browsers and iOS use env(). Everything below is 0 on screens without cutouts. */
+:root {
+  --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --sal: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --sar: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+}
+body { padding-left: var(--sal); padding-right: var(--sar); }
+.topbar { padding-top: var(--sat); height: calc(var(--topbar) + var(--sat)); box-sizing: border-box; }
+.layout { height: calc(100vh - var(--topbar) - var(--sat)); }
+.overlay { padding-top: calc(2rem + var(--sat)); }
+.toasts { bottom: calc(1.6rem + var(--sab)); }
+.pctl { left: calc(.7rem + var(--sal)); }
+.rc-head { padding-top: var(--sat); }
+@media (max-width: 900px) {
+  /* a solid strip behind the status bar / camera so scrolled content never shows under it */
+  body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: var(--sat); background: var(--bg); z-index: 35; pointer-events: none; }
+  body { padding-bottom: calc(4.2rem + var(--sab)); }
+  .layout { height: auto; }
+  .player { top: var(--sat); }
+  .tabs { top: calc(var(--sat) + (100vw - var(--sal) - var(--sar)) * 9 / 16); }
+  .bottombar { padding-bottom: calc(.35rem + var(--sab)); padding-left: calc(.5rem + var(--sal)); padding-right: calc(.5rem + var(--sar)); }
+  .toasts { bottom: calc(5rem + var(--sab)); }
+  .panel { padding-bottom: calc(1.5rem + var(--sab)); max-height: calc(88vh - var(--sat)); }
+  .panel-actions { bottom: calc(-1.5rem - var(--sab)); }
+  .overlay { padding-top: var(--sat); }
+}

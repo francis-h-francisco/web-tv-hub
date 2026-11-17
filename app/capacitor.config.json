@@ -18,6 +18,11 @@
     "LocalNotifications": {
       "smallIcon": "ic_stat_tv",
       "iconColor": "#FFB347"
+    },
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "DARK",
+      "hidden": false
     }
   }
 }
