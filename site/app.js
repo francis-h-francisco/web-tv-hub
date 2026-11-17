@@ -154,13 +154,18 @@
     await loadEpgFor(neededLangs());
     pruneExpired();
     renderTabs(); renderGuide();
-    const want = new URLSearchParams(location.search).get('ch') || store.get('last', null);
+    const qp = new URLSearchParams(location.search);
+    const want = qp.get('ch') || store.get('last', null);
     const wantCh = want && S.byId.get(want);
+    if (qp.get('ch')) explainIfHidden(qp.get('ch'));
     const startCh = (wantCh && isVisible(wantCh)) ? wantCh : (forYou()[0] || bestStart());
     if (startCh) {
       // open the guide on the channel's own category so what's playing is visible
       if (!tabList().includes(startCh) && startCh.category !== 'byo') { S.tab = tabs().find((t) => t.list.includes(startCh)) ? tabs().find((t) => t.list.includes(startCh)).id : S.tab; renderTabs(); renderGuide(); }
       play(startCh, { list: tabList() });
+      const rs = +qp.get('remind');
+      if (rs && wantCh === startCh && rs > Date.now() && !hasReminder(startCh.id, rs) && progs(startCh).some((x) => x.s === rs)) setTimeout(() => toggleReminder(startCh, rs), 800);
+      if (qp.get('ch') || qp.get('remind')) history.replaceState(null, '', location.pathname);
     }
     setInterval(() => { renderTimeline(); refreshGuideTimes(); }, 30000);
     setInterval(checkReminders, 20000); checkReminders();
@@ -178,6 +183,17 @@
   }
   function loadScript(src) {
     return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+  }
+  // a shared link opened somewhere the channel can't play: say why instead of silently showing something else
+  function explainIfHidden(id) {
+    const raw = (S.raw || []).find((x) => x.id === id);
+    if (!raw) { setTimeout(() => toast("That channel isn't available any more. Here's what's on now."), 1500); return; }
+    let why = null;
+    if (!S.byId.has(id)) why = "can't play in this browser. Try the Android app or Safari.";
+    else if (!regionOk(raw)) why = "isn't offered in " + countryName(S.country) + '.';
+    else if (!langOk(raw)) why = 'is in ' + langName(raw.lang) + '. Add it with 🌐 to watch.';
+    else if (isUnavailable(raw)) why = "isn't working where you are right now.";
+    if (why) setTimeout(() => toast(esc(raw.name) + ' ' + esc(why) + " Here's what's on now instead.", null, 7000), 1500);
   }
   function tickClock() { $('#clock').textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
 
@@ -601,15 +617,17 @@
     const pct = Math.min(100, ((t - now.s) / (now.e - now.s)) * 100);
     const ae = document.activeElement;
     const focusedRemind = ae && ae.dataset ? ae.dataset.remind : null;
-    const remindBtn = (p) => { const on = hasReminder(ch.id, p.s); return '<button class="remind' + (on ? ' on' : '') + '" data-focus data-remind="' + p.s + '">' + (on ? '✓ Reminder set' : '🔔 Remind me') + '</button>'; };
+    const remindBtn = (p) => { const on = hasReminder(ch.id, p.s); return '<div class="tl-actions"><button class="remind' + (on ? ' on' : '') + '" data-focus data-remind="' + p.s + '">' + (on ? '✓ Reminder set' : '🔔 Remind me') + '</button>' + shareBtn(p) + '</div>'; };
+    const shareBtn = (p) => ch.category === 'byo' ? '' : '<button class="remind" data-focus data-share="' + p.s + '" aria-label="Share ' + esc(p.t) + '">↗ Share</button>';
     box.innerHTML =
       (prev ? '<div class="tl-seg past"><div class="tl-pill">Previous · ended ' + fmtTime(prev.e) + '</div><div class="tl-title">' + esc(prev.t) + '</div>' + sub(prev) + '</div>' : '<div class="tl-seg past"><div class="tl-pill">Previous</div><div class="tl-sub">—</div></div>') +
       '<div class="tl-seg now"><div class="tl-pill">● Now playing</div><div class="tl-title">' + esc(now.t) + '</div>' + sub(now) + tags(now) +
         (now.d ? '<div class="tl-desc">' + esc(now.d) + '</div>' : '') +
-        '<div class="tl-bar"><i style="width:' + pct.toFixed(1) + '%"></i></div><div class="tl-time">' + fmtTime(now.s) + ' – ' + fmtTime(now.e) + ' · ' + inMins(now.e - t) + ' left</div></div>' +
+        '<div class="tl-bar"><i style="width:' + pct.toFixed(1) + '%"></i></div><div class="tl-time">' + fmtTime(now.s) + ' – ' + fmtTime(now.e) + ' · ' + inMins(now.e - t) + ' left</div><div class="tl-actions">' + shareBtn(now) + '</div></div>' +
       (next ? '<div class="tl-seg next"><div class="tl-pill">Up next · ' + fmtTime(next.s) + '</div><div class="tl-title">' + esc(next.t) + '</div>' + sub(next) + tags(next) + '<div class="tl-time">starts in ' + inMins(next.s - t) + '</div>' + remindBtn(next) + '</div>' : '<div class="tl-seg next"><div class="tl-pill">Up next</div><div class="tl-sub">Not listed yet</div></div>') +
       (later ? '<div class="tl-seg later"><div class="tl-pill">Later · ' + fmtTime(later.s) + '</div><div class="tl-title">' + esc(later.t) + '</div>' + sub(later) + remindBtn(later) + '</div>' : '<div class="tl-seg later"><div class="tl-pill">Later</div><div class="tl-sub">Not listed yet</div></div>');
     $$('[data-remind]', box).forEach((b) => b.addEventListener('click', () => toggleReminder(ch, +b.dataset.remind)));
+    $$('[data-share]', box).forEach((b) => b.addEventListener('click', () => share(ch, list.find((x) => x.s === +b.dataset.share))));
     if (focusedRemind) { const b = $('[data-remind="' + focusedRemind + '"]', box); if (b) focusEl(b); }
   }
 
@@ -998,6 +1016,7 @@
     else if (a === 'remote') openRemote();
     else if (a === 'home') { closeOverlay(); setBottom('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
     else if (a === 'fullscreen') enterFs();
+    else if (a === 'sharech' && S.current) share(S.current, null);
     else if (a === 'fav' && S.current) {
       const id = S.current.id;
       if (S.favs.has(id)) S.favs.delete(id); else { S.favs.add(id); toast('Added <b>' + esc(S.current.name) + '</b> to Favorites.', null, 3000); }
@@ -1087,6 +1106,37 @@
     }
   });
   document.addEventListener('pointerdown', () => { if (!S.interacted) unmuteOnce(); }, { once: true });
+
+  // ---------------------------------------------------------------- share (rich-preview links)
+  const SITE = location.origin + location.pathname.replace(/[^/]*$/, '');
+  const slug = (id) => String(id).replace(/[^A-Za-z0-9._-]/g, '_');
+  function shareUrl(ch, p) {
+    // show pages exist for shows on now or starting within ~9 h of the last refresh; otherwise share the channel
+    const gen = S.generated ? new Date(S.generated).getTime() : Date.now();
+    if (p && p.s < gen + 9 * 3600e3) return SITE + 's/' + slug(ch.id) + '/' + Math.round(p.s / 60000) + '.html';
+    return SITE + 's/' + slug(ch.id) + '.html';
+  }
+  async function share(ch, p) {
+    if (!ch || ch.category === 'byo') return;
+    const url = shareUrl(ch, p);
+    const live = p && p.s <= Date.now();
+    const text = p ? (live ? 'Watching ' + p.t + ' on ' + ch.name + ', free on Web TV Hub' : p.t + ' is on ' + ch.name + ' at ' + fmtTime(p.s) + ', free on Web TV Hub') : ch.name + ' is free on Web TV Hub';
+    if (navigator.share && isMobile()) { try { await navigator.share({ title: p ? p.t : ch.name, text, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+    const enc = encodeURIComponent, u = enc(url), tx = enc(text);
+    openOverlay('<h2>Share</h2><p>' + esc(p ? p.t + ' · ' + ch.name : ch.name) + (p ? '<br><span class="small">' + (live ? 'On now' : 'Starts ' + fmtTime(p.s)) + '. The link shows a preview card and stops working after the show ends.</span>' : '') + '</p>' +
+      '<input class="field" id="shareUrl" readonly value="' + esc(url) + '">' +
+      '<div class="chips" style="margin-top:.8rem"><button class="btn primary" data-focus data-autofocus id="copyLink">Copy link</button>' +
+      '<a class="btn" data-focus target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=' + u + '">Facebook</a>' +
+      '<a class="btn" data-focus target="_blank" rel="noopener" href="https://wa.me/?text=' + enc(text + ' ' + url) + '">WhatsApp</a>' +
+      '<a class="btn" data-focus target="_blank" rel="noopener" href="https://x.com/intent/post?text=' + tx + '&url=' + u + '">X</a>' +
+      '<a class="btn" data-focus target="_blank" rel="noopener" href="https://t.me/share/url?url=' + u + '&text=' + tx + '">Telegram</a>' +
+      '<a class="btn" data-focus href="viber://forward?text=' + enc(text + ' ' + url) + '">Viber</a>' +
+      '<a class="btn" data-focus href="mailto:?subject=' + enc(p ? p.t : ch.name) + '&body=' + enc(text + '\n' + url) + '">Email</a></div>');
+    $('#copyLink').onclick = async () => {
+      try { await navigator.clipboard.writeText(url); } catch (e) { const f = $('#shareUrl'); f.select(); document.execCommand && document.execCommand('copy'); }
+      $('#copyLink').textContent = '✓ Copied';
+    };
+  }
 
   // ---------------------------------------------------------------- phone remote (TV side)
   const changeListeners = new Set();

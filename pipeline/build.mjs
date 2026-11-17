@@ -7,6 +7,8 @@ import { loadRegions, channelRegions } from './regions.mjs';
 import { makeChecker } from './health.mjs';
 import { buildEpg } from './epg.mjs';
 import { buildPeople, buildDirectory } from './people.mjs';
+import { buildShare } from './share.mjs';
+import { dirname } from 'node:path';
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
@@ -112,4 +114,8 @@ const byCat = Object.fromEntries(categories.map((c) => [c.name, outChannels.filt
 const guides = {};
 for (const v of Object.values(via)) guides[v] = (guides[v] || 0) + 1;
 await writeFile(`${OUT}/report.json`, JSON.stringify({ generated, excluded: stats.excluded, health, byCategory: byCat, epgChannels: Object.keys(epg).length, guides, castTitles: Object.keys(people).length, langFix, regionKnown: outChannels.filter((c) => c.regions).length }, null, 2));
+if (!flag('--skip-share')) {
+  try { await buildShare(outChannels, epg, categories, { outDir: dirname(OUT), siteUrl: config.siteUrl }, log); }
+  catch (e) { log('share pages failed: ' + e.message); }
+}
 log('done', JSON.stringify(byCat));

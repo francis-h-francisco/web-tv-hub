@@ -98,3 +98,10 @@ test('language guess from schedule text', () => {
 test('primary language is the main audio track', () => {
   assert.equal(primaryLang({ streams: [{ lang: 'hin' }], languages: ['hin', 'eng'] }), 'hin');
 });
+
+import { SHARE_JS, slug } from './share.mjs';
+import vm from 'node:vm';
+test('share page script is valid JavaScript', () => {
+  assert.doesNotThrow(() => new vm.Script(SHARE_JS));
+  assert.equal(slug('Foo Bar.us'), 'Foo_Bar.us');
+});

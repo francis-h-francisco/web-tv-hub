@@ -82,6 +82,10 @@ body.fs .fs-osd.show { display: block; }
 .tl-bar > i { display: block; height: 100%; background: var(--live); }
 .tl-time { color: var(--dim); font-size: .8rem; font-variant-numeric: tabular-nums; }
 .remind { align-self: flex-start; margin-top: auto; background: var(--bg3); border: 1px solid var(--line); border-radius: .5rem; padding: .35rem .75rem; font-size: .82rem; }
+.tl-actions { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: auto; }
+.tl-actions .remind { margin-top: 0; }
+.tl-actions:empty { display: none; }
+.tvbtn { display: none; }
 .remind.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 
 /* ---------- tabs ---------- */
@@ -169,7 +173,8 @@ body.fs .fs-osd.show { display: block; }
   body { padding-bottom: calc(4.2rem + env(safe-area-inset-bottom)); }
   .topbar { padding: 0 1rem; }
   .topnav { display: none; }
-  .clock { margin-left: auto; font-size: .95rem; }
+  .clock { display: none; }
+  .tvbtn { display: inline-flex; margin-left: auto; align-items: center; gap: .3rem; background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: .4rem .85rem; font-size: .85rem; }
   .layout { display: block; height: auto; padding: 0; }
   .watch { display: contents; }
   .player { position: sticky; top: 0; z-index: 30; border-radius: 0; }

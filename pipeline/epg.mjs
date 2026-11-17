@@ -59,6 +59,39 @@ export async function buildEpg(channels, epgConfig, log) {
     }
     log(`epg ${src.name}: ${added} channels`);
   }
+  // Final pass: iptv-org's guides.json maps channels to exact listing ids on i.mjh.nz (per-country Plex,
+  // Roku, Pluto, Samsung, Foxtel, Australian regional files...). Exact ids, so no name guessing.
+  if (epgConfig.iptvGuides !== false) {
+    try {
+      const r = await fetch('https://iptv-org.github.io/api/guides.json');
+      const guides = r.ok ? await r.json() : [];
+      const byFile = new Map(); // listing file -> Map(listing id -> our channel id)
+      const ids = new Set(channels.filter((c) => !epg[c.id]).map((c) => c.id));
+      for (const g of guides) {
+        if (g.site !== 'i.mjh.nz' || !ids.has(g.channel) || !g.site_id.includes('#')) continue;
+        const [file, xid] = g.site_id.split('#');
+        if (!byFile.has(file)) byFile.set(file, new Map());
+        if (![...byFile.values()].some((m) => [...m.values()].includes(g.channel))) byFile.get(file).set(xid, g.channel);
+      }
+      let added = 0;
+      for (const [file, want] of byFile) {
+        if (!want.size) continue;
+        try {
+          const rr = await fetch('https://i.mjh.nz/' + file + '.xml.gz');
+          if (!rr.ok) continue;
+          let buf = Buffer.from(await rr.arrayBuffer());
+          if (buf[0] === 0x1f && buf[1] === 0x8b) buf = gunzipSync(buf);
+          const parsed = parseXmltv(buf.toString('utf8'), new Set(want.keys()), from, to);
+          for (const [xid, list] of Object.entries(parsed)) {
+            const cid = want.get(xid);
+            if (epg[cid] || !hasNowish(list, now)) continue;
+            epg[cid] = list; via[cid] = 'i.mjh.nz ' + file; how[cid] = 'id'; added++;
+          }
+        } catch (e) { /* one file failing shouldn't stop the rest */ }
+      }
+      log(`epg iptv-org guide map: ${added} channels from ${byFile.size} listing files`);
+    } catch (e) { log(`epg iptv-org guide map failed: ${e.message}`); }
+  }
   return { epg, via, meta, how };
 }
 

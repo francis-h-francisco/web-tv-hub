@@ -262,5 +262,6 @@
     "castPerTitle": 8,
     "budgetSeconds": 300
   },
-  "maxPerCategoryOtherLanguage": 15
+  "maxPerCategoryOtherLanguage": 15,
+  "siteUrl": "https://francis-h-francisco.github.io/web-tv-hub/"
 }

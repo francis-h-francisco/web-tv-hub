@@ -2,3 +2,4 @@ node_modules/
 site/data/
 .DS_Store
 .cache/
+site/s/

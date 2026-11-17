@@ -4,12 +4,18 @@
   "private": true,
   "description": "Zero-cost lean-back web TV hub built on iptv-org public data",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build:data": "node pipeline/build.mjs --out site/data",
     "build:data:quick": "node pipeline/build.mjs --out site/data --limit 60",
     "test": "node --test pipeline/test.mjs",
     "serve": "python3 -m http.server 8080 --directory site"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "sharp": "^0.35.5"
+  }
 }
