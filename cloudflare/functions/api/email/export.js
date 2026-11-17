@@ -2,7 +2,7 @@
 // CSV of people who confirmed their email AND explicitly opted in to marketing, with the consent record.
 import { authorized, json } from './_email.js';
 export async function onRequestGet({ request, env }) {
-  if (!authorized(request, env)) return json({ error: 'unauthorized' }, request);
+  if (!(await authorized(request, env))) return json({ error: 'unauthorized' }, request);
   const { results } = await env.DB.prepare(
     `SELECT email, cc, consent_version, consent_at, consent_text, confirmed_at FROM subscribers
      WHERE marketing = 1 AND marketing_withdrawn_at IS NULL AND unsubscribed_at IS NULL AND confirmed_at IS NOT NULL ORDER BY consent_at`

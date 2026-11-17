@@ -4,7 +4,7 @@
 import { json, authorized, now, confirmEmail, reminderEmail } from './_email.js';
 const LEAD = 60 * 60e3, WINDOW = 12 * 60e3;
 export async function onRequestGet({ request, env }) {
-  if (!authorized(request, env)) return json({ error: 'unauthorized' }, request);
+  if (!(await authorized(request, env))) return json({ error: 'unauthorized' }, request);
   const u = new URL(request.url); const origin = u.origin;
   // the sender says how many emails it may still send today (Gmail's daily quota); never hand out more
   let budget = Math.max(0, Math.min(200, parseInt(u.searchParams.get('max') || '50', 10) || 0));

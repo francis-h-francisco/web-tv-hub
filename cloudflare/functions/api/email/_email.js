@@ -23,9 +23,58 @@ export async function rateLimited(env, request, kind, max) {
   return false;
 }
 
-export function authorized(request, env) {
+// Who may read the outbox (/due, /export):
+//  1. the owner's Google Apps Script, proving itself with a Google-signed ID token for the sender address
+//     stored in the D1 config table (key 'sender_email'); no shared secret to leak; or
+//  2. a shared secret, if one is set as the Cloudflare secret EMAIL_SECRET (manual setups).
+export async function authorized(request, env) {
   const h = request.headers.get('Authorization') || '';
-  return !!env.EMAIL_SECRET && env.EMAIL_SECRET.length >= 24 && h === 'Bearer ' + env.EMAIL_SECRET;
+  if (!h.startsWith('Bearer ')) return false;
+  const tok = h.slice(7).trim();
+  if (tok.split('.').length === 3) {
+    const row = await env.DB.prepare("SELECT v FROM config WHERE k = 'sender_email'").first().catch(() => null);
+    const owner = row && String(row.v).toLowerCase();
+    if (!owner) return false;
+    const claims = await verifyGoogleIdToken(tok);
+    if (!claims || claims.email_verified !== true || String(claims.email).toLowerCase() !== owner) return false;
+    // Pin the token's audience (the sender script's own Google client) on first use, so a sign-in
+    // token the owner gives some other app can't be replayed here.
+    const aud = String(claims.aud || '');
+    const pinned = await env.DB.prepare("SELECT v FROM config WHERE k = 'sender_aud'").first().catch(() => null);
+    if (pinned && pinned.v) return pinned.v === aud;
+    await env.DB.prepare("INSERT OR IGNORE INTO config (k, v) VALUES ('sender_aud', ?)").bind(aud).run();
+    return true;
+  }
+  const secret = env.EMAIL_SECRET || '';
+  if (secret.length < 24) return false;
+  const a = new TextEncoder().encode(tok), b = new TextEncoder().encode(secret);
+  if (a.length !== b.length) return false;
+  let diff = 0; for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
+const b64url = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+let certCache = { at: 0, keys: [] };
+/** Verify a Google-issued ID token (RS256) against Google's public keys; returns its claims or null. */
+export async function verifyGoogleIdToken(jwt) {
+  try {
+    const [h64, p64, s64] = jwt.split('.');
+    const header = JSON.parse(new TextDecoder().decode(b64url(h64)));
+    const claims = JSON.parse(new TextDecoder().decode(b64url(p64)));
+    if (header.alg !== 'RS256') return null;
+    if (!['accounts.google.com', 'https://accounts.google.com'].includes(claims.iss)) return null;
+    const t = Math.floor(Date.now() / 1000);
+    if (!(claims.exp > t - 60) || !(claims.iat < t + 300)) return null;
+    if (Date.now() - certCache.at > 3600e3 || !certCache.keys.some((k) => k.kid === header.kid)) {
+      const r = await fetch('https://www.googleapis.com/oauth2/v3/certs');
+      certCache = { at: Date.now(), keys: (await r.json()).keys || [] };
+    }
+    const jwk = certCache.keys.find((k) => k.kid === header.kid);
+    if (!jwk) return null;
+    const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+    const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64url(s64), new TextEncoder().encode(h64 + '.' + p64));
+    return ok ? claims : null;
+  } catch { return null; }
 }
 
 export function when(ms, tz) {
