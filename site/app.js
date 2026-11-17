@@ -291,9 +291,12 @@
     const rerender = () => { renderTabs(); renderGuide(); if (hadFocus && sib && sib.dataset) focusRow(sib.dataset.ch); };
     if (row) { row.classList.add('gone'); setTimeout(rerender, 300); } else renderTabs();
     if (reason !== 'probe') return;
+    // No popup: the count is shown quietly in More → About. Only the very first time ever do we explain it, once.
     S.hiddenCount = (S.hiddenCount || 0) + 1;
-    clearTimeout(S.hideToastT);
-    S.hideToastT = setTimeout(() => { toast('Hid ' + S.hiddenCount + ' channel' + (S.hiddenCount > 1 ? 's' : '') + " that aren't available where you are right now.", null, 5000, 'hidden'); S.hiddenCount = 0; }, 2500);
+    if (!store.get('hidHintShown', false)) {
+      clearTimeout(S.hideToastT);
+      S.hideToastT = setTimeout(() => { store.set('hidHintShown', true); toast("Some channels don't play where you are, so we hide them for you. You'll find the count in More.", null, 6000, 'hidden'); }, 2500);
+    }
   }
 
   // Background check from the viewer's own network (catches region locks), two channels at a time.
@@ -1181,9 +1184,9 @@
       '<h3>About</h3><p>A free guide to live channels that broadcasters already stream for free. We check every channel every 6 hours, and your device double-checks the ones you can see, so channels that don\'t work for you are removed automatically.</p>' +
       '<p>We don\'t host or re-stream any video. Channel data comes from the open <a href="https://github.com/iptv-org/iptv" target="_blank" rel="noopener">iptv-org</a> project; schedules and channel descriptions from public listings of free ad-supported services; cast information from <a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>.</p>' +
       '<p>To keep the guide honest, your device anonymously reports whether channels play (just the channel and works / doesn\'t work; your country comes from your network). Channels several viewers in a country can\'t play are hidden for everyone there. Nothing else is collected.</p>' +
-      '<p><a href="privacy.html" target="_blank" rel="noopener">Privacy</a>: what we collect (very little) and your choices.</p>' +
+      '<p class="links"><a href="download.html">Android app</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms &amp; disclaimer</a></p>' +
       '<p>Rights-holder and want a channel removed? <a href="https://github.com/francis-h-francisco/web-tv-hub/issues/new?title=Removal%20request" target="_blank" rel="noopener">Open a removal request</a>.</p>' +
-      '<p class="small">Channel list checked ' + esc(relTime(S.generated)) + '.' + (S.hiddenForBrowser ? ' ' + S.hiddenForBrowser + ' more free channels play on Android TV sticks, phones and Safari but not in this browser.' : '') + '</p>' +
+      '<p class="small">Channel list checked ' + esc(relTime(S.generated)) + '.' + (S.hiddenCount ? ' ' + S.hiddenCount + ' channel' + (S.hiddenCount > 1 ? 's were' : ' was') + " hidden this visit because " + (S.hiddenCount > 1 ? "they don't" : "it doesn't") + ' play where you are.' : '') + (S.hiddenForBrowser ? ' ' + S.hiddenForBrowser + ' more free channels play on Android TV sticks, phones and Safari but not in this browser.' : '') + '</p>' +
       '<div class="panel-actions"><button class="btn" data-focus data-close data-autofocus>Close</button></div>');
     drawQr(url);
     const ib = $('[data-install]'); if (ib) ib.onclick = async () => { installPrompt.prompt(); await installPrompt.userChoice.catch(() => {}); installPrompt = null; closeOverlay(); };
