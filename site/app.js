@@ -943,6 +943,7 @@
     if ($('#overlay').hidden) pushBack();
     const m = /^<h2>([\s\S]*?)<\/h2>/.exec(html);
     if (m) html = '<div class="panel-head"><h2>' + m[1] + '</h2><button class="closex" data-focus data-close aria-label="Close">✕</button></div>' + html.slice(m[0].length);
+    $('#toasts').innerHTML = ''; // nothing may cover what the dialog says (e.g. consent wording)
     $('#panel').innerHTML = html; $('#overlay').hidden = false; overlayClose = onClose || null;
     $$('#panel img').forEach(imgFallback);
     $$('#panel [data-close]').forEach((b) => b.addEventListener('click', closeOverlay));
