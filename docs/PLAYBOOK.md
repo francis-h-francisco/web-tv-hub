@@ -98,7 +98,7 @@ Large, high-contrast cards; arrow keys, OK/Enter and Back; also mouse and touch.
 - **Phone remote without an account.** The TV shows a QR code and a 6-letter code, and the phone connects peer-to-peer (WebRTC; PeerJS's free public broker only introduces them).
 - **Android app.** A Capacitor shell around the web app, adding notifications that fire even when the app is closed. Every build is made by GitHub Actions, scanned with ClamAV (never published if anything is found), and published with a SHA-256 checksum and a VirusTotal link on `download.html`.
 
-## 8d. Email reminders and marketing consent (built 2026-11-17; sender: Gmail via Google Apps Script; auth by Google-signed ID token, no shared secret)
+## 8d. Email reminders and marketing consent (PARKED 2026-11-17, switched off; see ROADMAP.md. Built 2026-11-17; sender: Gmail via Google Apps Script; auth by Google-signed ID token, no shared secret)
 - Email reminders need a server: something to store addresses and send at the right time. That's the Cloudflare Worker + D1 phase, plus an email sender.
 - Consent rules we follow (Philippine Data Privacy Act; GDPR for EU visitors; CAN-SPAM): reminder emails never require marketing consent. Marketing is a **separate, unticked** checkbox that names who will email (e.g. "Web TV Hub and [named sister brands]"), with a one-click unsubscribe in every email and a privacy notice saying exactly how addresses are used. No bundled or disguised consent: it's invalid under these laws and the list would be legally unusable.
 

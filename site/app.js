@@ -827,7 +827,7 @@
       const rem = { ch: ch.id, name: ch.name, s: p.s, t: p.t, fired: OFFSETS.filter((o) => Date.now() >= p.s - o).map(String) };
       S.reminders.push(rem); scheduleNative(rem);
       if (emailToken()) emailReminder(rem);
-      else if (!nativeNotes() && !kids() && !S.emailOffered && (S.emailOffered = true)) setTimeout(() => toast('Want this reminder by email too?', { label: '📧 Email me', fn: () => openEmail(rem) }, 9000, 'emailoffer'), 1200);
+      else if (EMAIL_ON && !nativeNotes() && !kids() && !S.emailOffered && (S.emailOffered = true)) setTimeout(() => toast('Want this reminder by email too?', { label: '📧 Email me', fn: () => openEmail(rem) }, 9000, 'emailoffer'), 1200);
       toast("We'll remind you about <b>" + esc(p.t) + '</b> at ' + fmtTime(p.s) + ' (also 1 hour and 15 minutes before)' + (nativeNotes() ? ', even when the app is closed.' : ' while this site is open. Get the Android app for notifications when it\'s closed.'));
       if (window.Notification && Notification.permission === 'default') { try { Notification.requestPermission(); } catch (e) { /* unsupported */ } }
     }
@@ -852,11 +852,14 @@
   }
 
   // ---------------------------------------------------------------- email reminders
+  // Parked (2026-11-17): see docs/ROADMAP.md. Flip to true once a sender address is chosen and the
+  // server's EMAIL_ENABLED variable is set.
+  const EMAIL_ON = false;
   // Reminder emails never require marketing consent. Offers from our sister brands are a separate,
   // unticked choice (wording kept identical to cloudflare/functions/api/email/_email.js).
   const MARKETING_TEXT_HTML = 'Also send me occasional updates and offers from Web TV Hub and its sister brands: <a href="https://norvicka.pages.dev" target="_blank" rel="noopener">Norvicka Studio</a> (practical systems and automations for small businesses) and <a href="https://preview.pivory.pages.dev" target="_blank" rel="noopener">Pivory Systems</a> (ready-made, automated business systems). I can unsubscribe anytime.';
   const tzName = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) { return ''; } };
-  function emailToken() { return store.get('emailToken', null); }
+  function emailToken() { return EMAIL_ON ? store.get('emailToken', null) : null; }
   function reminderPayload(r) {
     const ch = S.byId.get(r.ch); const p = ch && progs(ch).find((x) => x.s === r.s);
     return { ch: r.ch, chName: r.name, title: r.t, start: r.s, url: ch ? shareUrl(ch, p) : undefined };
@@ -1109,7 +1112,7 @@
         missing.slice(0, 3).map((p) => '<a class="btn small" data-focus target="_blank" rel="noopener" href="https://www.justwatch.com/ph/search?q=' + encodeURIComponent(p.label) + '">Where to watch “' + esc(p.label) + '” ↗</a>').join('') + '</div>' : '') +
       '<h3>Reminders (' + rem.length + '/' + FREE_REMINDERS + ')</h3>' +
       (rem.length ? '<div class="list">' + rem.map((r) => '<button class="li" data-focus data-unrem="' + esc(r.ch) + '|' + r.s + '"><span class="when">' + fmtTime(r.s) + '</span><span class="what"><b>' + esc(r.t) + '</b><small>' + esc(r.name) + '</small></span><span class="small">Remove ✕</span></button>').join('') + '</div>' : '<p>No reminders yet. Use 🔔 Remind me on any upcoming show.</p>') +
-      '<h3>Email reminders</h3><div id="emailBox"><p class="small">Checking…</p></div>' +
+      (EMAIL_ON ? '<h3>Email reminders</h3><div id="emailBox"><p class="small">Checking…</p></div>' : '') +
       '<h3>Favorite channels</h3>' +
       (favs.length ? '<div class="list">' + favs.map((c) => { const np = nowProg(c); return '<button class="li" data-focus data-play="' + esc(c.id) + '"><span class="when">' + (np ? '● NOW' : 'LIVE') + '</span><span class="what"><b>' + esc(c.name) + '</b><small>' + esc(np ? np.t : c.desc || '') + '</small></span><span class="small">Watch ▸</span></button>'; }).join('') + '</div>' : '<p>Tap ☆ next to a channel\'s name to add it here.</p>') +
       '<div class="panel-actions"><button class="btn" data-focus data-close data-autofocus>Close</button></div>');
