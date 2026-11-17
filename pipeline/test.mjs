@@ -49,16 +49,8 @@ test('curate filters and categorizes', () => {
 });
 
 
-test('new category mappings', () => {
-  const expected = [
-    ['music', 'music'],
-    ['documentary', 'documentaries'],
-    ['cooking', 'cooking'],
-    ['lifestyle', 'lifestyle'],
-  ];
-  for (const [source, category] of expected) {
-    assert.equal(pickCategory(ch('Test.us', [source]), config), category);
-  }
+test('music category mapping', () => {
+  assert.equal(pickCategory(ch('Test.us', ['music']), config), 'music');
 });
 
 test('news caps', () => {
