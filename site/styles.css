@@ -390,3 +390,23 @@ body.fs #castBtn:not([hidden]) { display: grid !important; }
 
 .brand-logo { width: 2rem; height: 2rem; border-radius: .5rem; display: block; flex: 0 0 auto; }
 @media (max-width: 900px) { .brand-logo { width: 1.75rem; height: 1.75rem; } }
+
+/* ---------- audit fixes (2026-11-17): small phones, tiny text, tap targets ---------- */
+.r-watching { font-size: max(.74rem, 11.5px); }
+.r-now em, .r-next em { font-size: max(.76rem, 11.5px); }
+.tl-pill { font-size: max(.8rem, 11.5px); }
+.tag { font-size: max(.72rem, 11px); }
+a.back, .rc-link { display: inline-block; padding: .65rem 0; }
+[data-goloc] { display: inline-block; padding: .5rem .2rem; margin: -.5rem 0; }
+@media (pointer: coarse) {
+  .remind { min-height: 2.5rem; display: inline-flex; align-items: center; }
+}
+/* phones narrower than ~400px: header buttons go icon-only so nothing pushes the page sideways */
+@media (max-width: 400px) {
+  .brand { font-size: 1.1rem; gap: .45rem; }
+  .tvbtn { font-size: 0; gap: 0; padding: .4rem .7rem; }
+  .tvbtn .ic { font-size: 1rem; width: 1.15rem; height: 1.15rem; }
+  .castbtn { padding: .4rem .7rem; }
+  .castbtn.on { font-size: .85rem; }
+  .bottombar button { font-size: max(.72rem, 11px); min-width: 0; }
+}

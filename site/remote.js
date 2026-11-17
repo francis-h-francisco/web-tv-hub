@@ -70,7 +70,7 @@
     connect(code.toUpperCase().replace(/[^A-Z0-9]/g, ''));
   }
   function askCode(msg) {
-    $('#rc').innerHTML = '<div class="rc-head"><b>📱 Phone remote</b></div>' +
+    $('#rc').innerHTML = '<div class="rc-head"><b><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><circle cx="12" cy="8" r="1.6" fill="currentColor" stroke="none"/><path d="M10.5 17.5h3"/></svg> Phone remote</b></div>' +
       '<p class="rc-p">' + (msg ? esc(msg) + '<br><br>' : '') + 'On your TV, open Web TV Hub → <b>Remote</b>, then scan the QR code with this phone or type the 6-letter code.</p>' +
       '<input class="field rc-code" id="rcIn" maxlength="6" placeholder="ABC123" autocomplete="off" autocapitalize="characters" spellcheck="false">' +
       '<button class="btn primary rc-go" id="rcGo">Connect</button><a class="rc-link" href="./">← Back to watching on this phone</a>';
@@ -78,7 +78,7 @@
     $('#rcGo').onclick = go; $('#rcIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
   }
   async function connect(code) {
-    $('#rc').innerHTML = '<div class="rc-head"><b>📱 Phone remote</b><span class="rc-dot wait">Connecting…</span></div><p class="rc-p">Connecting to TV code <b>' + esc(code) + '</b>…</p>';
+    $('#rc').innerHTML = '<div class="rc-head"><b><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><circle cx="12" cy="8" r="1.6" fill="currentColor" stroke="none"/><path d="M10.5 17.5h3"/></svg> Phone remote</b><span class="rc-dot wait">Connecting…</span></div><p class="rc-p">Connecting to TV code <b>' + esc(code) + '</b>…</p>';
     try { await loadPeer(); } catch (e) { return askCode(e.message); }
     const peer = new window.Peer({ debug: 0 });
     let conn = null, state = null, gotOpen = false;
@@ -95,16 +95,16 @@
     function status(kind, text) { const el = $('#rcDot'); if (el) { el.className = 'rc-dot ' + kind; el.textContent = text; } }
     function render() {
       $('#rc').innerHTML =
-        '<div class="rc-head"><b>📱 Remote</b><button class="rc-dot ok" id="rcDot">Connected</button></div>' +
+        '<div class="rc-head"><b><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><circle cx="12" cy="8" r="1.6" fill="currentColor" stroke="none"/><path d="M10.5 17.5h3"/></svg> Remote</b><button class="rc-dot ok" id="rcDot">Connected</button></div>' +
         '<div class="rc-now" id="rcNow"></div>' +
         '<div class="rc-pad">' +
           '<button class="rc-b up" data-k="up" aria-label="Up">▲</button><button class="rc-b left" data-k="left" aria-label="Left">◀</button>' +
           '<button class="rc-b ok" data-k="ok">OK</button><button class="rc-b right" data-k="right" aria-label="Right">▶</button><button class="rc-b down" data-k="down" aria-label="Down">▼</button>' +
         '</div>' +
-        '<div class="rc-row"><button class="rc-b wide" data-k="back">↩ Back</button><button class="rc-b wide" data-k="fs">⛶ Full screen</button></div>' +
+        '<div class="rc-row"><button class="rc-b wide" data-k="back">↩ Back</button><button class="rc-b wide" data-k="fs"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg> Full screen</button></div>' +
         '<div class="rc-row"><div class="rc-rocker"><button class="rc-b" data-k="chup">CH ▲</button><button class="rc-b" data-k="chdown">CH ▼</button></div>' +
         '<div class="rc-rocker"><button class="rc-b" data-k="volup">VOL +</button><button class="rc-b" data-k="voldown">VOL −</button></div>' +
-        '<div class="rc-rocker" style="flex:0 0 4rem"><button class="rc-b" data-k="pause" aria-label="Pause or play">⏯</button><button class="rc-b" data-k="mute" aria-label="Mute">🔇</button></div></div>' +
+        '<div class="rc-rocker" style="flex:0 0 4rem"><button class="rc-b" data-k="pause" aria-label="Pause or play"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="3.5" height="14" rx="1" fill="currentColor" stroke="none"/><path d="M12 5v14l8-7z" fill="currentColor" stroke="none"/></svg></button><button class="rc-b" data-k="mute" aria-label="Mute"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.5v5h3.8l4.7 4V5.5l-4.7 4z" fill="currentColor" stroke="none"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button></div></div>' +
         '<div class="rc-tabs" id="rcTabs"></div><div class="rc-list" id="rcList"></div>' +
         '<a class="rc-link" href="./">Watch on this phone instead</a>';
       $('#rc').addEventListener('click', (e) => {

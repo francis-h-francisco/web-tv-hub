@@ -1,5 +1,5 @@
 // Offline app shell: everything is network-first (always fresh), with the cached copy used when offline.
-const VERSION = 'wth-v18';
+const VERSION = 'wth-v19';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'remote.js', 'vendor/hls.min.js', 'icon.svg', 'icon-192.png', 'apple-touch-icon.png', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
