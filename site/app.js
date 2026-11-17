@@ -241,7 +241,7 @@
   // ---------------------------------------------------------------- shared reports (anonymous)
   // Each device reports "played / didn't play" per channel (country comes from the network, nothing else
   // is sent). Channels several viewers in a country couldn't play are hidden for everyone there.
-  const API = /\.pages\.dev$/.test(location.hostname) ? '/api' : 'https://webtv.pages.dev/api';
+  const API = /\.pages\.dev$/.test(location.hostname) ? '/api' : 'https://webtv-hub.pages.dev/api';
   S.shared = new Set();
   async function loadSharedUnavailable() {
     try {

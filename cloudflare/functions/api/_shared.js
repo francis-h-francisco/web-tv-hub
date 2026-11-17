@@ -1,9 +1,9 @@
 // Shared helpers for the tiny Web TV Hub API (Cloudflare Pages Functions + D1).
-const ORIGINS = ['https://francis-h-francisco.github.io', 'https://webtv.pages.dev'];
+const ORIGINS = ['https://francis-h-francisco.github.io', 'https://webtv-hub.pages.dev'];
 
 export function cors(request) {
   const o = request.headers.get('Origin') || '';
-  const ok = ORIGINS.includes(o) || /^https:\/\/[a-z0-9-]+\.webtv\.pages\.dev$/.test(o) || /^https?:\/\/localhost(:\d+)?$/.test(o);
+  const ok = ORIGINS.includes(o) || /^https:\/\/[a-z0-9-]+\.webtv-hub\.pages\.dev$/.test(o) || /^https?:\/\/localhost(:\d+)?$/.test(o);
   return {
     'Access-Control-Allow-Origin': ok ? o : ORIGINS[0],
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',

@@ -51,7 +51,7 @@ jobs:
           cp -r site/. /tmp/cf/public/
           cp -r cloudflare/functions cloudflare/wrangler.toml /tmp/cf/
           # share pages point at the domain they're served from
-          find /tmp/cf/public/s -name '*.html' -exec sed -i 's#https://francis-h-francisco.github.io/web-tv-hub/#https://webtv.pages.dev/#g' {} +
+          find /tmp/cf/public/s -name '*.html' -exec sed -i 's#https://francis-h-francisco.github.io/web-tv-hub/#https://webtv-hub.pages.dev/#g' {} +
           printf '/data/*\n  Cache-Control: no-cache\n/s/img/*\n  Cache-Control: public, max-age=86400\n/vendor/*\n  Cache-Control: public, max-age=604800\n' > /tmp/cf/public/_headers
           cd /tmp/cf && git init -q -b cf-pages && git add -A
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "Site build ${GITHUB_SHA::7} ($(date -u +%FT%TZ))"
