@@ -92,7 +92,7 @@ body.fs .fs-osd.show { display: block; }
 .tl-bar { height: .35rem; background: var(--line); border-radius: 999px; overflow: hidden; margin-top: .2rem; }
 .tl-bar > i { display: block; height: 100%; background: var(--live); }
 .tl-time { color: var(--dim); font-size: .8rem; font-variant-numeric: tabular-nums; }
-.remind { align-self: flex-start; margin-top: auto; background: var(--bg3); border: 1px solid var(--line); border-radius: .5rem; padding: .35rem .75rem; font-size: .82rem; }
+.remind { white-space: nowrap; align-self: flex-start; margin-top: auto; background: var(--bg3); border: 1px solid var(--line); border-radius: .5rem; padding: .35rem .75rem; font-size: .82rem; }
 .tl-actions { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: auto; }
 .tl-actions .remind { margin-top: 0; }
 .tl-actions:empty { display: none; }
@@ -265,3 +265,28 @@ body.remote-mode { padding: 0; }
 .rc-item { text-align: left; padding: .7rem .9rem; border-radius: .6rem; background: var(--bg2); border: 1px solid var(--line); display: flex; flex-direction: column; }
 .rc-item span { color: var(--dim); font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rc-item.on { border-color: var(--live); }
+
+/* Touch screens: comfortable tap targets (about 40px) for small buttons and chips */
+@media (pointer: coarse) {
+  .btn.small, .chip { min-height: 2.5rem; }
+  .btn.small { display: inline-flex; align-items: center; }
+  .tvbtn { min-height: 2.5rem; }
+}
+
+/* Laptop / tablet-landscape widths: the guide column is narrow, so drop the "Previous" card and give Now more room */
+@media (min-width: 901px) and (max-width: 1279px) {
+  .timeline { grid-template-columns: 1.5fr 1fr 1fr; }
+  .tl-seg.past { display: none; }
+}
+/* Wide screens: when there's nothing earlier to show, don't spend a column on an empty card */
+@media (min-width: 1280px) {
+  .timeline:has(.tl-seg.past.none) { grid-template-columns: 1.7fr 1fr 1fr; }
+  .tl-seg.past.none { display: none; }
+}
+/* Short wide screens (TV sticks at 960x540 / 1280x720, small laptops): shrink the player a little so
+   Now / Up next stay on screen without scrolling. */
+@media (min-width: 901px) and (max-height: 800px) {
+  .player { width: min(100%, calc(56vh * 16 / 9)); align-self: center; }
+  .watch { gap: .75rem; }
+  .ch-desc { -webkit-line-clamp: 1; }
+}

@@ -543,10 +543,15 @@
     if (S.byo && S.byo.channels.length) t.push({ id: 'byo', name: 'My playlist', list: S.byo.channels });
     return t;
   }
-  function tabList() { const t = tabs(); const cur = t.find((x) => x.id === S.tab) || t[0]; return cur ? cur.list : []; }
+  // With no saved choice, start on For you or the first category, not on short personal lists (Continue watching, Favorites).
+  const defaultTab = (t) => t.find((x) => x.id === 'foryou' || x.id === 'kids') || t.find((x) => x.id !== 'recent' && x.id !== 'favs') || t[0];
+  function tabList() { const t = tabs(); const cur = t.find((x) => x.id === S.tab) || defaultTab(t); return cur ? cur.list : []; }
   function renderTabs() {
     const t = tabs();
-    if (!t.find((x) => x.id === S.tab)) S.tab = t[0] ? t[0].id : null;
+    // If the open tab vanished (e.g. Continue watching emptied once its only channel started playing),
+    // switch tabs AND redraw the guide, so the list always matches the highlighted tab.
+    if (!t.find((x) => x.id === S.tab)) { S.tab = defaultTab(t) ? defaultTab(t).id : null; if (S.tabRendered) queueMicrotask(renderGuide); }
+    S.tabRendered = true;
     const langLabel = S.langs.map((l) => langName(l)).slice(0, 2).join(', ') + (S.langs.length > 2 ? ' +' + (S.langs.length - 2) : '');
     $('#tabs').innerHTML = t.map((x) => '<button class="tab' + (x.id === S.tab ? ' on' : '') + '" role="tab" data-focus data-tab="' + x.id + '">' + esc(x.name) + '<small>' + x.list.length + '</small></button>').join('') +
       '<button class="tab lang" data-focus data-action="langs">🌐 ' + esc(langLabel) + '</button>' +
@@ -788,7 +793,7 @@
     const remindBtn = (p) => { const on = hasReminder(ch.id, p.s); return '<div class="tl-actions"><button class="remind' + (on ? ' on' : '') + '" data-focus data-remind="' + p.s + '">' + (on ? '✓ Reminder set' : '🔔 Remind me') + '</button>' + shareBtn(p) + '</div>'; };
     const shareBtn = (p) => ch.category === 'byo' ? '' : '<button class="remind" data-focus data-share="' + p.s + '" aria-label="Share ' + esc(p.t) + '">↗ Share</button>';
     box.innerHTML =
-      (prev ? '<div class="tl-seg past"><div class="tl-pill">Previous · ended ' + fmtTime(prev.e) + '</div><div class="tl-title">' + esc(prev.t) + '</div>' + sub(prev) + '</div>' : '<div class="tl-seg past"><div class="tl-pill">Previous</div><div class="tl-sub">—</div></div>') +
+      (prev ? '<div class="tl-seg past"><div class="tl-pill">Previous · ended ' + fmtTime(prev.e) + '</div><div class="tl-title">' + esc(prev.t) + '</div>' + sub(prev) + '</div>' : '<div class="tl-seg past none"><div class="tl-pill">Previous</div><div class="tl-sub">—</div></div>') +
       '<div class="tl-seg now"><div class="tl-pill">● Now playing</div><div class="tl-title">' + esc(now.t) + '</div>' + sub(now) + tags(now) +
         (now.d ? '<div class="tl-desc">' + esc(now.d) + '</div>' : '') +
         '<div class="tl-bar"><i style="width:' + pct.toFixed(1) + '%"></i></div><div class="tl-time">' + fmtTime(now.s) + ' – ' + fmtTime(now.e) + ' · ' + inMins(now.e - t) + ' left</div><div class="tl-actions">' + shareBtn(now) + '</div></div>' +
@@ -1134,7 +1139,7 @@
       '<div class="panel-actions"><button class="btn" data-focus data-close>Close</button></div>');
     const q = $('#q'); let t = null;
     q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => runSearch(q.value), 200); });
-    if (!isMobile()) setTimeout(() => q.focus(), 60);
+    try { q.focus({ preventScroll: true }); } catch (e) { /* ignore */ } // search is the one dialog where opening the keyboard right away helps on phones too
   }
   function runSearch(v) {
     const out = $('#sr'); if (!out) return;
@@ -1176,6 +1181,7 @@
   let installPrompt = null;
   window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; });
   function openMore() {
+    setBottom('more');
     const url = location.origin + location.pathname;
     openOverlay('<h2>More</h2>' +
       '<h3>Open on another screen</h3><div style="display:flex;gap:1.4rem;align-items:center;flex-wrap:wrap"><div class="qr" id="qr"></div><div style="flex:1;min-width:14rem"><p>Scan with your phone camera, or type this address into your TV\'s browser (TV Bro, BrowseHere, Silk):</p><div class="bigurl">' + esc(url.replace(/^https:\/\//, '')) + '</div><p class="small">On a TV stick, bookmark it so it\'s one click next time.</p></div></div>' +
