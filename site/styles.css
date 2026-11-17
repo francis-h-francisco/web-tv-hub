@@ -320,3 +320,6 @@ body { padding-left: var(--sal); padding-right: var(--sar); }
   .panel-actions { bottom: calc(-1.5rem - var(--sab)); }
   .overlay { padding-top: var(--sat); }
 }
+.unmute { white-space: nowrap; }
+.unmute .on-touch { display: none; }
+@media (pointer: coarse) { .unmute .on-touch { display: inline; } .unmute .on-tv { display: none; } }

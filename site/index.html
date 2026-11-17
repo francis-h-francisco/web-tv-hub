@@ -32,7 +32,7 @@
     <div class="player" id="player" data-focus tabindex="0" aria-label="Video player. Press OK for full screen">
       <video id="video" playsinline muted autoplay></video>
       <div class="player-msg" id="playerMsg"></div>
-      <button class="unmute" id="unmute" hidden>🔇 Tap or press OK for sound</button>
+      <button class="unmute" id="unmute" hidden>🔇 <span class="on-touch">Tap for sound</span><span class="on-tv">Tap or press OK for sound</span></button>
       <div class="pctl" id="pctl">
         <button class="pbtn" data-focus data-action="pause" id="pauseBtn" aria-label="Pause">⏸</button>
         <button class="pbtn" data-focus data-action="mute" id="muteBtn" aria-label="Mute">🔊</button>
