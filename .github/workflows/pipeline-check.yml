@@ -1,0 +1,72 @@
+name: Pipeline validation (no deployment)
+
+on:
+  push:
+    branches:
+      - feature/music-documentaries-food-lifestyle
+    paths:
+      - '.github/workflows/pipeline-check.yml'
+      - 'config/**'
+      - 'pipeline/**'
+      - 'site/**'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pipeline-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out selected branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build curated channel data
+        run: node pipeline/build.mjs --out site/data
+
+      - name: Validate generated data
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const channelsPath = 'site/data/channels.json';
+          const reportPath = 'site/data/report.json';
+          if (!fs.existsSync(channelsPath)) throw new Error('Missing channels.json');
+          if (!fs.existsSync(reportPath)) throw new Error('Missing report.json');
+          const data = JSON.parse(fs.readFileSync(channelsPath, 'utf8'));
+          if (!Array.isArray(data.channels)) throw new Error('channels.json has no channels array');
+          if (data.channels.length < 100) throw new Error(`Only ${data.channels.length} channels; refusing to accept suspiciously small output`);
+          const music = data.channels.filter(channel => channel.category === 'music').length;
+          console.log(JSON.stringify({ totalChannels: data.channels.length, musicChannels: music }, null, 2));
+          console.log('--- Pipeline report ---');
+          console.log(fs.readFileSync(reportPath, 'utf8'));
+          NODE
+
+      - name: Upload generated data and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: music-pipeline-validation-${{ github.run_number }}
+          path: |
+            site/data/channels.json
+            site/data/report.json
+          if-no-files-found: warn
+          retention-days: 14
