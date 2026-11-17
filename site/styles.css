@@ -286,7 +286,8 @@ body.remote-mode { padding: 0; }
 /* Short wide screens (TV sticks at 960x540 / 1280x720, small laptops): shrink the player a little so
    Now / Up next stay on screen without scrolling. */
 @media (min-width: 901px) and (max-height: 800px) {
-  .player { width: min(100%, calc(56vh * 16 / 9)); align-self: center; }
+  /* narrow the whole watch column to the player's width (so everything under it lines up) and give the guide the rest */
+  .layout { grid-template-columns: minmax(0, min(62%, calc(56vh * 16 / 9))) minmax(0, 1fr); }
   .watch { gap: .75rem; }
   .ch-desc { -webkit-line-clamp: 1; }
 }
@@ -346,3 +347,43 @@ body.casting .tvbtn { display: none !important; }
 body.casting .row[data-nocast] { opacity: .45; }
 body.casting .row[data-nocast]::after { content: "Can't cast"; position: absolute; right: .8rem; top: .6rem; font-size: .7rem; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: .05rem .5rem; background: var(--bg); }
 body.casting .row { position: relative; }
+
+/* ---------- icons: one line-icon set everywhere ---------- */
+.ic { width: 1.25em; height: 1.25em; display: inline-block; vertical-align: -.22em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+.pbtn .ic, .iconbtn .ic { width: 1.2rem; height: 1.2rem; vertical-align: 0; }
+.cb-row .pbtn .ic { width: 1.3rem; height: 1.3rem; }
+.navbtn .ic, .tvbtn .ic, .castbtn .ic { width: 1.1em; height: 1.1em; }
+.castbtn { gap: .35rem; }
+.bottombar button span { filter: none !important; line-height: 0; }
+.bottombar button span .ic { width: 1.4rem; height: 1.4rem; vertical-align: 0; }
+.bottombar button.on span { color: var(--accent); }
+.unmute .ic { width: 1.1em; height: 1.1em; }
+.tab .ic { width: 1em; height: 1em; vertical-align: -.15em; }
+/* the header cast button is the one to use; the player's copy only shows in full screen (no header there) */
+#castBtn { display: none !important; }
+body.fs #castBtn:not([hidden]) { display: grid !important; }
+
+/* ---------- category row: arrows + fades when it scrolls sideways ---------- */
+.tabs-wrap { position: relative; flex: 0 0 auto; }
+.tabs-arrow { position: absolute; top: 0; bottom: 1px; z-index: 2; width: 3rem; display: flex; align-items: center; border: 0; color: var(--text); cursor: pointer; }
+.tabs-arrow[hidden] { display: none; }
+.tabs-arrow.left { left: 0; justify-content: flex-start; padding-left: .45rem; background: linear-gradient(90deg, var(--bg2) 55%, transparent); }
+.tabs-arrow.right { right: 0; justify-content: flex-end; padding-right: .45rem; background: linear-gradient(270deg, var(--bg2) 55%, transparent); }
+.tabs-arrow .ic { width: 1.6rem; height: 1.6rem; padding: .2rem; border-radius: 50%; background: var(--bg3); border: 1px solid var(--line); }
+@media (max-width: 900px) {
+  .tabs-arrow { display: none !important; }
+  .tabs-wrap { position: sticky; z-index: 20; top: calc(var(--sat) + (100vw - var(--sal) - var(--sar)) * 9 / 16); }
+  .tabs { position: static; }
+}
+@media (pointer: coarse) { .tabs-arrow { display: none !important; } }
+
+/* schedule labels never spill out of their card */
+.tl-pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* schedule cards follow the width of their own column (zoomed laptops, small windows), not the screen */
+@media (min-width: 901px) {
+  .watch { container-type: inline-size; }
+  @container (max-width: 860px) {
+    .timeline { grid-template-columns: 1.5fr 1fr 1fr; }
+    .tl-seg.past { display: none; }
+  }
+}

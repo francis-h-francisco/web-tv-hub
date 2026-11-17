@@ -106,6 +106,10 @@
   }
 
   // ---------------------------------------------------------------- text matching (typo-tolerant)
+  // ---------------------------------------------------------------- icons (one consistent line-icon set; emoji render differently on every device)
+  const ICONS = {"globe": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z\"/>", "pin": "<path d=\"M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z\"/><circle cx=\"12\" cy=\"10\" r=\"2.3\"/>", "play": "<path d=\"M7 4.5v15l12-7.5z\" fill=\"currentColor\" stroke=\"none\"/>", "pause": "<rect x=\"6\" y=\"4.5\" width=\"4\" height=\"15\" rx=\"1\" fill=\"currentColor\" stroke=\"none\"/><rect x=\"14\" y=\"4.5\" width=\"4\" height=\"15\" rx=\"1\" fill=\"currentColor\" stroke=\"none\"/>", "vol": "<path d=\"M3.5 9.5v5h3.8l4.7 4V5.5l-4.7 4z\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.3a8 8 0 0 1 0 11.4\"/>", "mute": "<path d=\"M3.5 9.5v5h3.8l4.7 4V5.5l-4.7 4z\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M16 9.5l5 5M21 9.5l-5 5\"/>", "voldown": "<path d=\"M3.5 9.5v5h3.8l4.7 4V5.5l-4.7 4z\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M15.5 12h5.5\"/>", "volup": "<path d=\"M3.5 9.5v5h3.8l4.7 4V5.5l-4.7 4z\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M15.5 12h5.5M18.25 9.25v5.5\"/>", "cast": "<path d=\"M2.5 17.5a4 4 0 0 1 4 4M2.5 13.5a8 8 0 0 1 8 8M2.5 9.5a12 12 0 0 1 12 12\"/><path d=\"M2.5 6.5v-1a2 2 0 0 1 2-2h15a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-2.5\"/>", "pip": "<rect x=\"2.5\" y=\"4.5\" width=\"19\" height=\"15\" rx=\"2\"/><rect x=\"12\" y=\"11\" width=\"7\" height=\"6\" rx=\"1\" fill=\"currentColor\" stroke=\"none\"/>", "moon": "<path d=\"M20 14.6A8.2 8.2 0 0 1 9.4 4a8.2 8.2 0 1 0 10.6 10.6z\"/>", "star": "<path d=\"M12 3.2l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z\"/>", "starOn": "<path d=\"M12 3.2l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z\" fill=\"currentColor\"/>", "share": "<path d=\"M12 3.5v11M7.5 8l4.5-4.5L16.5 8\"/><path d=\"M5 12.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-6.5\"/>", "fs": "<path d=\"M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5\"/>", "prev": "<path d=\"M6 5v14\"/><path d=\"M19 5L9 12l10 7z\" fill=\"currentColor\" stroke=\"none\"/>", "next": "<path d=\"M18 5v14\"/><path d=\"M5 5l10 7-10 7z\" fill=\"currentColor\" stroke=\"none\"/>", "remote": "<rect x=\"7\" y=\"2.5\" width=\"10\" height=\"19\" rx=\"2.5\"/><circle cx=\"12\" cy=\"8\" r=\"1.6\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M10.5 17.5h3\"/>", "tv": "<rect x=\"2.5\" y=\"6\" width=\"19\" height=\"13\" rx=\"2\"/><path d=\"M8 3l4 3 4-3\"/>", "search": "<circle cx=\"11\" cy=\"11\" r=\"6.5\"/><path d=\"M20.5 20.5l-4.8-4.8\"/>", "user": "<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21a8 8 0 0 1 16 0\"/>", "menu": "<path d=\"M4 6.5h16M4 12h16M4 17.5h16\"/>"};
+  const ic = (n) => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + ICONS[n] + '</svg>';
+
   function fold(s) {
     return String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
   }
@@ -463,7 +467,7 @@
     const h = store.get('history', []).filter((x) => x.id !== ch.id);
     h.unshift({ id: ch.id, at: Date.now() }); store.set('history', h.slice(0, 15));
   }
-  function recent() { return store.get('history', []).map((x) => S.byId.get(x.id)).filter((c) => c && isVisible(c) && c !== S.current).slice(0, 12); }
+  function recent() { return store.get('history', []).map((x) => S.byId.get(x.id)).filter((c) => c && isVisible(c) && !(S.current && c.id === S.current.id)).slice(0, 12); }
 
   // ---------------------------------------------------------------- kids mode
   // Only kids & family animation channels; leaving needs the parent's PIN. (A soft lock: it lives in this browser.)
@@ -503,11 +507,11 @@
     S.sleepAt = next ? Date.now() + next * 60000 : 0;
     clearTimeout(S.sleepT);
     if (next) S.sleepT = setTimeout(sleepNow, next * 60000);
-    const b = $('#sleepBtn'); b.classList.toggle('on', !!next); b.innerHTML = next ? '🌙<span class="badge">' + next + '</span>' : '🌙';
+    const b = $('#sleepBtn'); b.classList.toggle('on', !!next); b.innerHTML = ic('moon') + (next ? '<span class="badge">' + next + '</span>' : '');
     toast(next ? '🌙 Sleep timer: TV turns off in ' + next + ' min.' : 'Sleep timer off.', null, 2500, 'sleep');
   }
   function sleepNow() {
-    S.sleepAt = 0; const b = $('#sleepBtn'); b.classList.remove('on'); b.textContent = '🌙';
+    S.sleepAt = 0; const b = $('#sleepBtn'); b.classList.remove('on'); b.innerHTML = ic('moon');
     if (!S.paused) togglePause();
     if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
     setMsg('🌙 Sleep timer ended. Press play to keep watching.');
@@ -554,9 +558,30 @@
     S.tabRendered = true;
     const langLabel = S.langs.map((l) => langName(l)).slice(0, 2).join(', ') + (S.langs.length > 2 ? ' +' + (S.langs.length - 2) : '');
     $('#tabs').innerHTML = t.map((x) => '<button class="tab' + (x.id === S.tab ? ' on' : '') + '" role="tab" data-focus data-tab="' + x.id + '">' + esc(x.name) + '<small>' + x.list.length + '</small></button>').join('') +
-      '<button class="tab lang" data-focus data-action="langs">🌐 ' + esc(langLabel) + '</button>' +
-      '<button class="tab lang" data-focus data-action="location">📍 ' + esc(S.country ? countryName(S.country) : 'Location') + '</button>';
+      '<button class="tab lang" data-focus data-action="langs">' + ic('globe') + ' ' + esc(langLabel) + '</button>' +
+      '<button class="tab lang" data-focus data-action="location">' + ic('pin') + ' ' + esc(S.country ? countryName(S.country) : 'Location') + '</button>';
+    requestAnimationFrame(() => { const on = $('#tabs .tab.on'); if (on && on.scrollIntoView && !isMobile()) { try { on.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) { /* old browser */ } } updateTabArrows(); });
   }
+  // Category row: scrolls sideways with a mouse wheel or trackpad, and shows arrows when there's more.
+  function updateTabArrows() {
+    const t = $('#tabs'); if (!t) return;
+    const max = t.scrollWidth - t.clientWidth - 2;
+    $('#tabsLeft').hidden = t.scrollLeft <= 2; $('#tabsRight').hidden = t.scrollLeft >= max;
+  }
+  (function initTabScroll() {
+    const t = $('#tabs');
+    t.addEventListener('wheel', (e) => {
+      if (t.scrollWidth <= t.clientWidth) return;
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (!d) return;
+      e.preventDefault(); t.scrollLeft += d * (e.deltaMode === 1 ? 30 : 1);
+    }, { passive: false });
+    t.addEventListener('scroll', updateTabArrows, { passive: true });
+    window.addEventListener('resize', updateTabArrows);
+    const page = (dir) => t.scrollBy({ left: dir * t.clientWidth * 0.8, behavior: 'smooth' });
+    $('#tabsLeft').addEventListener('click', () => page(-1));
+    $('#tabsRight').addEventListener('click', () => page(1));
+  })();
   function setTab(id, keepFocus) {
     if (S.tab === id) return;
     S.tab = id; store.set('tab', id); renderTabs(); renderGuide(); notifyChange();
@@ -739,8 +764,8 @@
   }
   function updateControls() {
     const pb = $('#pauseBtn'), mb = $('#muteBtn');
-    if (pb) { pb.textContent = S.paused ? '▶' : '⏸'; pb.setAttribute('aria-label', S.paused ? 'Play (back to live)' : 'Pause'); pb.classList.toggle('on', S.paused); }
-    if (mb) { mb.textContent = video.muted ? '🔇' : '🔊'; mb.setAttribute('aria-label', video.muted ? 'Unmute' : 'Mute'); mb.classList.toggle('on', video.muted); }
+    if (pb) { pb.innerHTML = ic(S.paused ? 'play' : 'pause'); pb.setAttribute('aria-label', S.paused ? 'Play (back to live)' : 'Pause'); pb.classList.toggle('on', S.paused); }
+    if (mb) { mb.innerHTML = ic(video.muted ? 'mute' : 'vol'); mb.setAttribute('aria-label', video.muted ? 'Unmute' : 'Mute'); mb.classList.toggle('on', video.muted); }
   }
   video.addEventListener('volumechange', updateControls);
 
@@ -773,7 +798,7 @@
     const logo = $('#nowLogo');
     if (ch.logo) { logo.src = ch.logo; logo.hidden = false; logo.onerror = () => { logo.hidden = true; }; } else logo.hidden = true;
     const fav = S.favs.has(ch.id); const fb = $('#favBtn');
-    fb.textContent = fav ? '★' : '☆'; fb.classList.toggle('on', fav); fb.hidden = ch.category === 'byo';
+    fb.innerHTML = ic(fav ? 'starOn' : 'star'); fb.classList.toggle('on', fav); fb.hidden = ch.category === 'byo';
     fb.setAttribute('aria-label', fav ? 'Remove from favorites' : 'Add to favorites');
     document.title = ch.name + ' — Web TV Hub';
   }
@@ -1401,7 +1426,7 @@
   const castDevice = () => (castState.session ? castState.session.getCastDevice().friendlyName : (castState.n && castState.n.device) || 'your TV');
   function showCastButtons(on) {
     const b = $('#castBtn'); if (b) b.hidden = !on;
-    const t = $('#castTop'); if (t) { t.hidden = !on; t.classList.toggle('on', castConnected()); t.textContent = castConnected() ? '📡 Casting' : '📡'; t.setAttribute('aria-label', castConnected() ? 'Casting to ' + castDevice() + '. Tap for options' : 'Cast to a TV'); }
+    const t = $('#castTop'); if (t) { t.hidden = !on; t.classList.toggle('on', castConnected()); t.innerHTML = ic('cast') + (castConnected() ? ' Casting' : ''); t.setAttribute('aria-label', castConnected() ? 'Casting to ' + castDevice() + '. Tap for options' : 'Cast to a TV'); }
   }
   function initCast() {
     const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.WthCast;
@@ -1480,10 +1505,10 @@
     if (!castConnected()) return;
     document.body.classList.add('casting'); showCastButtons(true);
     $('#castbar').hidden = false;
-    $('#cbDev').textContent = '📡 Playing on ' + castDevice();
+    $('#cbDev').innerHTML = ic('cast') + ' Playing on ' + esc(castDevice());
     const ch = S.current, np = ch && nowProg(ch);
     $('#cbWhat').innerHTML = note || (ch ? '<b>' + esc(ch.name) + '</b>' + (np ? ' · ' + esc(np.t) : '') : '');
-    $('#cbPause').textContent = S.paused ? '▶' : '⏸'; $('#cbPause').setAttribute('aria-label', S.paused ? 'Play' : 'Pause');
+    $('#cbPause').innerHTML = ic(S.paused ? 'play' : 'pause'); $('#cbPause').setAttribute('aria-label', S.paused ? 'Play' : 'Pause');
     $('#cbMute').classList.toggle('on', castState.muted);
   }
   function castCmd(k) {
