@@ -261,7 +261,8 @@
     "enabled": true,
     "maxTitles": 2500,
     "batch": 40,
-    "castPerTitle": 8
+    "castPerTitle": 8,
+    "budgetSeconds": 300
   },
   "maxPerCategoryOtherLanguage": 15
 }

@@ -11,7 +11,8 @@ const SERIES_TYPES = ['Q5398426', 'Q581714', 'Q1259759', 'Q117467246', 'Q6395288
 const TYPES = [...FILM_TYPES, ...SERIES_TYPES];
 const CACHE_DAYS = 30;
 
-export async function buildPeople(epg, { cachePath, maxTitles = 2500, batch = 60, castPerTitle = 8 }, log) {
+export async function buildPeople(epg, { cachePath, maxTitles = 2500, batch = 60, castPerTitle = 8, budgetSeconds = 300 }, log) {
+  const deadline = Date.now() + budgetSeconds * 1000;
   // unique titles on the schedule, with a year when the listing has one
   const titles = new Map();
   for (const list of Object.values(epg)) {
@@ -33,6 +34,7 @@ export async function buildPeople(epg, { cachePath, maxTitles = 2500, batch = 60
   log(`people: ${titles.size} titles on schedule, ${todo.length} to look up`);
 
   for (let i = 0; i < todo.length; i += batch) {
+    if (Date.now() > deadline) { log(`people: time budget reached; ${todo.length - i} titles left for the next run`); break; }
     const chunk = todo.slice(i, i + batch);
     try {
       let rows;
