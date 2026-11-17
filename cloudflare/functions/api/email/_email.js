@@ -31,6 +31,17 @@ export async function authorized(request, env) {
   const h = request.headers.get('Authorization') || '';
   if (!h.startsWith('Bearer ')) return false;
   const tok = h.slice(7).trim();
+  if (tok.startsWith('ya29.')) {
+    // Google OAuth access token from the sender script (ScriptApp.getOAuthToken): ask Google who it belongs to.
+    const row = await env.DB.prepare("SELECT v FROM config WHERE k = 'sender_email'").first().catch(() => null);
+    const owner = row && String(row.v).toLowerCase();
+    if (!owner) return false;
+    const r = await fetch('https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(tok)).catch(() => null);
+    if (!r || !r.ok) return false;
+    const info = await r.json().catch(() => ({}));
+    if (String(info.email_verified) !== 'true' || String(info.email || '').toLowerCase() !== owner) return false;
+    return pinAudience(env, String(info.aud || info.azp || ''));
+  }
   if (tok.split('.').length === 3) {
     const row = await env.DB.prepare("SELECT v FROM config WHERE k = 'sender_email'").first().catch(() => null);
     const owner = row && String(row.v).toLowerCase();
@@ -39,11 +50,7 @@ export async function authorized(request, env) {
     if (!claims || claims.email_verified !== true || String(claims.email).toLowerCase() !== owner) return false;
     // Pin the token's audience (the sender script's own Google client) on first use, so a sign-in
     // token the owner gives some other app can't be replayed here.
-    const aud = String(claims.aud || '');
-    const pinned = await env.DB.prepare("SELECT v FROM config WHERE k = 'sender_aud'").first().catch(() => null);
-    if (pinned && pinned.v) return pinned.v === aud;
-    await env.DB.prepare("INSERT OR IGNORE INTO config (k, v) VALUES ('sender_aud', ?)").bind(aud).run();
-    return true;
+    return pinAudience(env, String(claims.aud || ''));
   }
   const secret = env.EMAIL_SECRET || '';
   if (secret.length < 24) return false;
@@ -51,6 +58,16 @@ export async function authorized(request, env) {
   if (a.length !== b.length) return false;
   let diff = 0; for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
   return diff === 0;
+}
+
+// Pin the token's audience (the sender script's own Google client) on first use, so a token the owner
+// gives some other app can't be replayed here. Delete config row 'sender_aud' to re-pin.
+async function pinAudience(env, aud) {
+  if (!aud) return false;
+  const pinned = await env.DB.prepare("SELECT v FROM config WHERE k = 'sender_aud'").first().catch(() => null);
+  if (pinned && pinned.v) return pinned.v === aud;
+  await env.DB.prepare("INSERT OR IGNORE INTO config (k, v) VALUES ('sender_aud', ?)").bind(aud).run();
+  return true;
 }
 
 const b64url = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
