@@ -720,11 +720,15 @@
   }
   $('#unmute').addEventListener('click', (e) => { e.stopPropagation(); unmuteOnce(); });
   // tap / click: unmute the first time, otherwise show the controls; double-tap / double-click: full screen
+  // controls stay hidden until the screen is tapped; tap again (or wait) to hide them
+  function showControls(ms) { const c = $('#pctl'); c.classList.add('show'); clearTimeout(S.pctlT); S.pctlT = setTimeout(() => c.classList.remove('show'), ms || 3500); }
   $('#player').addEventListener('click', (e) => {
-    if (e.target.closest('#pctl')) return; // the control buttons handle themselves
-    if (!S.interacted || Date.now() - (S.unmutedAt || 0) < 600) { unmuteOnce(); return; }
-    const c = $('#pctl'); c.classList.add('show'); clearTimeout(S.pctlT); S.pctlT = setTimeout(() => c.classList.remove('show'), 3500);
+    if (e.target.closest('#pctl')) { showControls(); return; } // keep them up while being used
+    if (!S.interacted || Date.now() - (S.unmutedAt || 0) < 600) unmuteOnce();
+    const c = $('#pctl');
+    if (c.classList.contains('show')) { c.classList.remove('show'); clearTimeout(S.pctlT); } else showControls();
   });
+  $('#player').addEventListener('mousemove', (e) => { if (e.pointerType !== 'touch' && !isMobile()) showControls(2500); });
   $('#player').addEventListener('dblclick', (e) => { if (e.target.closest('#pctl')) return; if (document.body.classList.contains('fs')) exitFs(); else enterFs(); });
 
   function renderNow() {

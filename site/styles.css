@@ -48,9 +48,9 @@ body.kbd .row.focused { box-shadow: inset 0 0 0 0.2rem var(--accent); }
 .player video { width: 100%; height: 100%; display: block; background: #000; }
 .player-msg { position: absolute; inset: auto 0 0 0; padding: 1rem 1.2rem; background: linear-gradient(transparent, rgba(0,0,0,.9)); color: #dfe3ea; font-size: 1rem; line-height: 1.4; }
 .player-msg:empty { display: none; }
-.pctl { position: absolute; left: .7rem; bottom: .7rem; display: flex; gap: .45rem; z-index: 3; opacity: .85; transition: opacity .2s; }
-.player:not(:hover) .pctl:not(:focus-within):not(.show) { opacity: .55; }
-body.fs .pctl { opacity: 0; } body.fs .player:hover .pctl, body.fs .pctl:focus-within, body.fs .pctl.show { opacity: .9; }
+.pctl { position: absolute; left: .7rem; bottom: .7rem; display: flex; gap: .45rem; z-index: 3; opacity: 0; pointer-events: none; transition: opacity .25s; }
+/* hidden until the screen is tapped (or the mouse moves over it, or a remote moves focus onto them) */
+.pctl.show, .pctl:focus-within { opacity: 1; pointer-events: auto; }
 .pbtn { width: 2.6rem; height: 2.6rem; border-radius: 50%; background: rgba(10,12,16,.72); border: 1px solid rgba(255,255,255,.18); font-size: 1.05rem; display: grid; place-items: center; backdrop-filter: blur(6px); }
 .pbtn.on { background: var(--accent); color: var(--accent-ink); }
 .pbtn .badge { position: absolute; transform: translate(.9rem, -.9rem); font-size: .6rem; background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 0 .3rem; font-weight: 800; }
