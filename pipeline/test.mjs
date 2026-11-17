@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { classifySource, curate, applyCaps, parseXmltv, xmltvTime, regDomain } from './lib.mjs';
+import { classifySource, curate, applyCaps, parseXmltv, xmltvTime, regDomain, pickCategory } from './lib.mjs';
 
 const config = JSON.parse(await readFile(new URL('../config/curation.json', import.meta.url), 'utf8'));
 const P = config.sourcePolicy;
@@ -46,6 +46,19 @@ test('curate filters and categorizes', () => {
   const f = candidates.find((c) => c.id === 'F.de');
   assert.equal(f.streams.length, 1);
   assert.match(f.streams[0].url, /en\.m3u8/);
+});
+
+
+test('new category mappings', () => {
+  const expected = [
+    ['music', 'music'],
+    ['documentary', 'documentaries'],
+    ['cooking', 'cooking'],
+    ['lifestyle', 'lifestyle'],
+  ];
+  for (const [source, category] of expected) {
+    assert.equal(pickCategory(ch('Test.us', [source]), config), category);
+  }
 });
 
 test('news caps', () => {
