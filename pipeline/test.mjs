@@ -53,6 +53,11 @@ test('music category mapping', () => {
   assert.equal(pickCategory(ch('Test.us', ['music']), config), 'music');
 });
 
+test('lifestyle category mapping stays separate from cooking', () => {
+  assert.equal(pickCategory(ch('Lifestyle.us', ['lifestyle']), config), 'lifestyle');
+  assert.equal(pickCategory(ch('Cooking.us', ['cooking']), config), null);
+});
+
 test('news caps', () => {
   const mk = (id, country) => ({ id, name: id, country, category: 'news', streams: [{}] });
   const list = [mk('BBCNews.uk', 'GB'), mk('DW.de', 'DE'), mk('CNN.us', 'US'), mk('AbanteTV.ph', 'PH'), mk('CLTV36.ph', 'PH'), mk('X.ph', 'PH'), mk('Y.ph', 'PH')];
