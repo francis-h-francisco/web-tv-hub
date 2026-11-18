@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/music-documentaries-food-lifestyle
+      - feature/lifestyle-category
     paths:
       - '.github/workflows/pipeline-check.yml'
       - 'config/**'
@@ -54,8 +55,18 @@ jobs:
           const data = JSON.parse(fs.readFileSync(channelsPath, 'utf8'));
           if (!Array.isArray(data.channels)) throw new Error('channels.json has no channels array');
           if (data.channels.length < 100) throw new Error(`Only ${data.channels.length} channels; refusing to accept suspiciously small output`);
-          const music = data.channels.filter(channel => channel.category === 'music').length;
-          console.log(JSON.stringify({ totalChannels: data.channels.length, musicChannels: music }, null, 2));
+          const counts = Object.fromEntries(
+            [...new Set(data.channels.map(channel => channel.category))].sort().map(category => [
+              category,
+              data.channels.filter(channel => channel.category === category).length
+            ])
+          );
+          console.log(JSON.stringify({
+            totalChannels: data.channels.length,
+            musicChannels: counts.music || 0,
+            lifestyleChannels: counts.lifestyle || 0,
+            categoryCounts: counts
+          }, null, 2));
           console.log('--- Pipeline report ---');
           console.log(fs.readFileSync(reportPath, 'utf8'));
           NODE
@@ -64,7 +75,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: music-pipeline-validation-${{ github.run_number }}
+          name: category-pipeline-validation-${{ github.run_number }}
           path: |
             site/data/channels.json
             site/data/report.json
