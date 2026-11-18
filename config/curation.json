@@ -81,6 +81,13 @@
       "from": [
         "music"
       ]
+    },
+    {
+      "id": "lifestyle",
+      "name": "Lifestyle",
+      "from": [
+        "lifestyle"
+      ]
     }
   ],
   "maxPerCategory": 60,
