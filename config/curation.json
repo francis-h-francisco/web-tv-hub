@@ -74,6 +74,13 @@
         "classic",
         "entertainment"
       ]
+    },
+    {
+      "id": "music",
+      "name": "Music",
+      "from": [
+        "music"
+      ]
     }
   ],
   "maxPerCategory": 60,
