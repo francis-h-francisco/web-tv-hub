@@ -1,0 +1,73 @@
+{
+  "generated": "2026-11-21T07:23:34.052Z",
+  "changes": {
+    "since": "2026-11-21T00:05:26.864Z",
+    "hours": 7.3,
+    "added": 3,
+    "removed": 2,
+    "streamChanged": 1,
+    "total": 713
+  },
+  "excluded": {
+    "noChannel": 2425,
+    "noCategory": 5254,
+    "notHttps": 3394,
+    "language": 1753,
+    "source_unknown": 1223,
+    "needsHeaders": 822,
+    "excludedCategory": 1402,
+    "source_denied": 428,
+    "closed": 93,
+    "blocklist": 4
+  },
+  "health": {
+    "checked": 1811,
+    "ok": 1536,
+    "fail": {
+      "http_400": 17,
+      "network": 72,
+      "variant_404": 28,
+      "http_404": 75,
+      "segment_404": 5,
+      "http_504": 5,
+      "http_403": 36,
+      "not_m3u8": 8,
+      "http_502": 5,
+      "segment_403": 20,
+      "variant_empty": 1,
+      "variant_502": 1,
+      "http_500": 1,
+      "timeout": 1
+    }
+  },
+  "byCategory": {
+    "Sports": 80,
+    "News": 67,
+    "Animations": 122,
+    "Sitcoms": 67,
+    "Movies": 134,
+    "TV Series": 138,
+    "Music": 105
+  },
+  "epgChannels": 493,
+  "guides": {
+    "Pluto TV": 283,
+    "Samsung TV Plus": 148,
+    "Plex": 42,
+    "Roku": 10,
+    "Pluto TV (by name)": 2,
+    "i.mjh.nz au/Adelaide/epg": 1,
+    "i.mjh.nz Plex/au": 1,
+    "i.mjh.nz Plex/gb": 1,
+    "i.mjh.nz PlutoTV/gb": 2,
+    "i.mjh.nz PlutoTV/es": 1,
+    "i.mjh.nz Roku/all": 1,
+    "i.mjh.nz SamsungTVPlus/us": 1
+  },
+  "castTitles": 270,
+  "langFix": {
+    "relabeled": 7,
+    "droppedGuides": 23
+  },
+  "regionKnown": 286
+}
