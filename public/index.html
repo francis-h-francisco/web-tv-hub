@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Watch hundreds of free live TV channels: TV series, movies, sitcoms, cartoons, sports and news. No sign-up, no fees. Works on TVs, phones and computers.">
+<link rel="canonical" href="https://webtv-hub.pages.dev/">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Web TV Hub"><meta property="og:locale" content="en_US">
+<meta property="og:title" content="Web TV Hub — Free live TV, no sign-up"><meta property="og:description" content="Watch hundreds of free live TV channels: TV series, movies, sitcoms, cartoons, sports and news. No sign-up, no fees. Works on TVs, phones and computers.">
+<meta property="og:url" content="https://webtv-hub.pages.dev/"><meta property="og:image" content="https://webtv-hub.pages.dev/og/home.jpg"><meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Web TV Hub: free live TV channels">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Web TV Hub — Free live TV, no sign-up">
+<meta name="twitter:description" content="Watch hundreds of free live TV channels: TV series, movies, sitcoms, cartoons, sports and news. No sign-up, no fees. Works on TVs, phones and computers."><meta name="twitter:image" content="https://webtv-hub.pages.dev/og/home.jpg"><meta name="twitter:image:alt" content="Web TV Hub: free live TV channels">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://webtv-hub.pages.dev/#site", "name": "Web TV Hub", "url": "https://webtv-hub.pages.dev/", "description": "Watch hundreds of free live TV channels: TV series, movies, sitcoms, cartoons, sports and news. No sign-up, no fees. Works on TVs, phones and computers.", "inLanguage": "en"}, {"@type": "WebApplication", "name": "Web TV Hub", "url": "https://webtv-hub.pages.dev/", "applicationCategory": "EntertainmentApplication", "operatingSystem": "Any (web browser), Android", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "image": "https://webtv-hub.pages.dev/og/home.jpg", "description": "Watch hundreds of free live TV channels: TV series, movies, sitcoms, cartoons, sports and news. No sign-up, no fees. Works on TVs, phones and computers.", "publisher": {"@type": "Organization", "name": "Web TV Hub"}}]}</script>
+<title>Web TV Hub — Free curated live TV</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img class="brand-logo" src="icon.svg" alt="" width="32" height="32"><span>Web TV Hub</span><button class="kidsbadge" data-action="kids">🧒 Kids mode</button></div>
+  <nav class="topnav" aria-label="Main">
+    <button class="navbtn" data-focus data-action="search">Search</button>
+    <button class="navbtn" data-focus data-action="mytv">My TV</button>
+    <button class="navbtn" data-focus data-action="profile">Profile</button>
+    <button class="navbtn" data-focus data-action="remote"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><circle cx="12" cy="8" r="1.6" fill="currentColor" stroke="none"/><path d="M10.5 17.5h3"/></svg> Remote</button>
+    <button class="navbtn" data-focus data-action="more">More</button>
+  </nav>
+  <div class="clock" id="clock"></div>
+  <button class="castbtn" data-action="cast" id="castTop" aria-label="Cast to a TV" hidden><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 17.5a4 4 0 0 1 4 4M2.5 13.5a8 8 0 0 1 8 8M2.5 9.5a12 12 0 0 1 12 12"/><path d="M2.5 6.5v-1a2 2 0 0 1 2-2h15a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-2.5"/></svg></button>
+  <button class="tvbtn" data-action="remote" aria-label="Use this phone as a TV remote"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><circle cx="12" cy="8" r="1.6" fill="currentColor" stroke="none"/><path d="M10.5 17.5h3"/></svg> Control TV</button>
+</header>
+
+<div class="layout">
+  <section class="watch" aria-label="Now watching">
+    <div class="player" id="player" data-focus tabindex="0" aria-label="Video player. Press OK for full screen">
+      <video id="video" playsinline muted autoplay></video>
+      <div class="player-msg" id="playerMsg"></div>
+      <button class="unmute" id="unmute" hidden><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.5v5h3.8l4.7 4V5.5l-4.7 4z" fill="currentColor" stroke="none"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg> <span class="on-touch">Tap for sound</span><span class="on-tv">Tap or press OK for sound</span></button>
+      <div class="castbar" id="castbar" hidden>
+        <div class="cb-dev" id="cbDev">📡 Casting</div>
+        <div class="cb-what" id="cbWhat"></div>
+        <div class="cb-row">
+          <button class="pbtn" data-cb="prev" aria-label="Previous channel"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14"/><path d="M19 5L9 12l10 7z" fill="currentColor" stroke="none"/></svg></button>
+          <button class="pbtn" data-cb="pause" id="cbPause" aria-label="Pause"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4.5" width="4" height="15" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4.5" width="4" height="15" rx="1" fill="currentColor" stroke="none"/></svg></button>
+          <button class="pbtn" data-cb="next" aria-label="Next channel"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14"/><path d="M5 5l10 7-10 7z" fill="currentColor" stroke="none"/></svg></button>
+          <button class="pbtn" data-cb="voldown" aria-label="Volume down"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.5v5h3.8l4.7 4V5.5l-4.7 4z" fill="currentColor" stroke="none"/><path d="M15.5 12h5.5"/></svg></button>
+          <button class="pbtn" data-cb="mute" id="cbMute" aria-label="Mute"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.5v5h3.8l4.7 4V5.5l-4.7 4z" fill="currentColor" stroke="none"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
+          <button class="pbtn" data-cb="volup" aria-label="Volume up"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.5v5h3.8l4.7 4V5.5l-4.7 4z" fill="currentColor" stroke="none"/><path d="M15.5 12h5.5M18.25 9.25v5.5"/></svg></button>
+        </div>
+        <button class="btn small" data-cb="stop">Stop casting</button>
+      </div>
+      <div class="pctl" id="pctl">
+        <button class="pbtn" data-focus data-action="pause" id="pauseBtn" aria-label="Pause"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4.5" width="4" height="15" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4.5" width="4" height="15" rx="1" fill="currentColor" stroke="none"/></svg></button>
+        <button class="pbtn" data-focus data-action="mute" id="muteBtn" aria-label="Mute"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.5v5h3.8l4.7 4V5.5l-4.7 4z" fill="currentColor" stroke="none"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.3a8 8 0 0 1 0 11.4"/></svg></button>
+        <button class="pbtn" data-focus data-action="cast" id="castBtn" aria-label="Cast to TV" hidden><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 17.5a4 4 0 0 1 4 4M2.5 13.5a8 8 0 0 1 8 8M2.5 9.5a12 12 0 0 1 12 12"/><path d="M2.5 6.5v-1a2 2 0 0 1 2-2h15a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-2.5"/></svg></button>
+        <button class="pbtn" data-focus data-action="pip" id="pipBtn" aria-label="Picture in picture" hidden><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1" fill="currentColor" stroke="none"/></svg></button>
+        <button class="pbtn" data-focus data-action="sleep" id="sleepBtn" aria-label="Sleep timer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.6A8.2 8.2 0 0 1 9.4 4a8.2 8.2 0 1 0 10.6 10.6z"/></svg></button>
+      </div>
+    </div>
+    <div class="nowcard">
+      <div class="ch-line">
+        <img id="nowLogo" class="ch-logo" alt="" hidden>
+        <div class="ch-text">
+          <div class="ch-name" id="nowName">Loading channels…</div>
+          <div class="ch-meta" id="nowMeta"></div>
+        </div>
+        <div class="ch-actions">
+          <button class="iconbtn" data-focus data-action="fav" id="favBtn" aria-label="Favorite"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z"/></svg></button>
+          <button class="iconbtn" data-focus data-action="sharech" aria-label="Share this channel"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M7.5 8l4.5-4.5L16.5 8"/><path d="M5 12.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-6.5"/></svg></button>
+          <button class="iconbtn" data-focus data-action="fullscreen" aria-label="Full screen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+        </div>
+      </div>
+      <div class="timeline" id="timeline" aria-label="Schedule"></div>
+    </div>
+  </section>
+
+  <section class="browse" aria-label="Channel guide">
+    <div class="tabs-wrap" id="tabsWrap">
+      <button class="tabs-arrow left" id="tabsLeft" aria-label="Show earlier categories" tabindex="-1" hidden><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="tabs" id="tabs" role="tablist"></div>
+      <button class="tabs-arrow right" id="tabsRight" aria-label="Show more categories" tabindex="-1" hidden><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+    </div>
+    <div class="guide" id="guide"></div>
+    <div class="peek" id="peek"></div>
+  </section>
+</div>
+
+<nav class="bottombar" aria-label="App">
+  <button data-action="home" class="on"><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="13" rx="2"/><path d="M8 3l4 3 4-3"/></svg></span>Watch</button>
+  <button data-action="search"><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20.5 20.5l-4.8-4.8"/></svg></span>Search</button>
+  <button data-action="mytv"><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z"/></svg></span>My TV</button>
+  <button data-action="profile"><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>Profile</button>
+  <button data-action="more"><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg></span>More</button>
+</nav>
+
+<div class="overlay" id="overlay" hidden><div class="panel" id="panel" role="dialog" aria-modal="true"></div></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="vendor/hls.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
